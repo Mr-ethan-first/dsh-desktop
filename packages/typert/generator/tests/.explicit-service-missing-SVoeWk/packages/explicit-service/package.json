@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/explicit-service",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  }
+}

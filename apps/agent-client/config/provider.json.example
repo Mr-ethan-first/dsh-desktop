@@ -1,0 +1,12 @@
+{
+  "_comment": "可选的本地 Provider 配置文件（本切片默认走环境变量；此文件仅作结构示例，不被代码自动加载）。生产建议用环境变量或后端下发。",
+  "provider": "zhipu",
+  "apiBase": "https://open.bigmodel.cn/api/paas/v4",
+  "primaryModel": "glm-5.1",
+  "fallbackModel": "glm-4.7-flash",
+  "tokenBudget": 20000000,
+  "models": [
+    { "id": "glm-5.1", "price": { "inputPer1M": 10, "outputPer1M": 22 } },
+    { "id": "glm-4.7-flash", "price": { "inputPer1M": 1, "outputPer1M": 2 } }
+  ]
+}

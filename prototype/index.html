@@ -1,0 +1,2695 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deepseek-harness 智能体客户端 · 交互原型 V1（依据 V3.6 详细设计）</title>
+<style>
+/* ============================================================
+   0. 设计令牌 Design Tokens
+   ============================================================ */
+:root{
+  /* Codex 极简风格 · 黑白双色体系（默认浅色） */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+
+  /* 浅色（默认） */
+  --shell-bg:#F4F4F5;
+  --shell-panel:#FFFFFF;
+  --shell-line:#E4E4E6;
+
+  --bg-0:#FFFFFF;      /* 应用底 */
+  --bg-1:#FAFAFA;      /* 面板 */
+  --bg-2:#FFFFFF;      /* 卡片 */
+  --bg-3:#F2F2F2;      /* hover / 输入 */
+  --bg-4:#E8E8E8;      /* 强 hover */
+  --line:#E6E6E6;
+  --line-2:#D4D4D6;
+  --text-1:#0A0A0A;
+  --text-2:#565656;
+  --text-3:#8A8A8A;
+  --text-4:#AEAEAE;
+
+  /* 主墨色（黑白体系的主操作色：浅色=黑，深色=白） */
+  --accent:#0A0A0A;
+  --accent-2:#2A2A2A;
+  --on-accent:#FFFFFF;
+  --accent-soft:rgba(10,10,10,.06);
+  --accent-line:rgba(10,10,10,.28);
+  --knob:#FFFFFF;
+
+  /* 中性语义色：仅以深浅 / 描边区分状态，不使用彩色 */
+  --ok:#0A0A0A;     --ok-soft:rgba(10,10,10,.06);
+  --warn:#0A0A0A;   --warn-soft:rgba(10,10,10,.06);
+  --danger:#0A0A0A; --danger-soft:rgba(10,10,10,.06);
+  --purple:#2A2A2A; --purple-soft:rgba(10,10,10,.06);
+  --cyan:#2A2A2A;   --cyan-soft:rgba(10,10,10,.06);
+  --pink:#0A0A0A;
+
+  --shadow-1:0 1px 2px rgba(10,10,10,.08);
+  --shadow-2:0 8px 24px rgba(10,10,10,.12);
+  --shadow-3:0 24px 64px rgba(10,10,10,.20);
+  --r-s:4px; --r-m:6px; --r-l:10px; --r-xl:14px;
+}
+html[data-theme="dark"]{
+  --shell-bg:#0A0A0A;
+  --shell-panel:#141414;
+  --shell-line:#262626;
+
+  --bg-0:#0E0E0E;
+  --bg-1:#161616;
+  --bg-2:#1A1A1A;
+  --bg-3:#222222;
+  --bg-4:#2C2C2C;
+  --line:#262626;
+  --line-2:#383838;
+  --text-1:#F5F5F5;
+  --text-2:#A6A6A6;
+  --text-3:#737373;
+  --text-4:#525252;
+
+  --accent:#F5F5F5;
+  --accent-2:#DEDEDE;
+  --on-accent:#0A0A0A;
+  --accent-soft:rgba(245,245,245,.10);
+  --accent-line:rgba(245,245,245,.32);
+  --knob:#0A0A0A;
+
+  --ok:#F5F5F5;     --ok-soft:rgba(245,245,245,.08);
+  --warn:#F5F5F5;   --warn-soft:rgba(245,245,245,.08);
+  --danger:#F5F5F5; --danger-soft:rgba(245,245,245,.08);
+  --purple:#DADADA; --purple-soft:rgba(245,245,245,.08);
+  --cyan:#DADADA;   --cyan-soft:rgba(245,245,245,.08);
+  --pink:#F5F5F5;
+
+  --shadow-1:0 1px 2px rgba(0,0,0,.5);
+  --shadow-2:0 8px 24px rgba(0,0,0,.55);
+  --shadow-3:0 24px 64px rgba(0,0,0,.65);
+}
+
+/* ============================================================
+   1. Reset & Base
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--shell-bg); color:var(--text-1);
+  font:13px/1.55 var(--sans); -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+h1,h2,h3,h4,p{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+ul{margin:0;padding:0;list-style:none}
+a{color:var(--accent-2);text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-4)}
+::-webkit-scrollbar-track{background:transparent}
+.ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ic-s{width:12px;height:12px}
+.ic-l{width:18px;height:18px}
+
+/* ============================================================
+   2. 原型外壳 Shell（非产品界面，仅用于演示与导航）
+   ============================================================ */
+.shell{display:grid;grid-template-columns:252px 1fr;height:100vh}
+.rail{
+  background:var(--shell-panel);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.rail-brand{padding:16px 16px 12px;border-bottom:1px solid var(--shell-line)}
+.rail-logo{display:flex;align-items:center;gap:9px}
+.rail-mark{
+  width:26px;height:26px;border-radius:7px;flex:none;
+  background:var(--accent);
+  display:grid;place-items:center;color:var(--on-accent);font-weight:700;font-size:11px;letter-spacing:.5px;
+}
+.rail-title{font-size:13px;font-weight:650;letter-spacing:.2px}
+.rail-sub{font-size:10.5px;color:var(--text-3);margin-top:1px}
+.rail-tag{
+  display:inline-flex;align-items:center;gap:4px;margin-top:10px;
+  font-size:10px;color:var(--text-3);background:var(--bg-3);
+  border:1px solid var(--line);border-radius:20px;padding:2px 8px;
+}
+.rail-nav{flex:1;overflow-y:auto;padding:10px 10px 16px}
+.rail-label{font-size:10px;letter-spacing:1px;color:var(--text-4);padding:12px 8px 6px;font-weight:600}
+.nav-item{
+  width:100%;display:flex;align-items:flex-start;gap:9px;text-align:left;
+  padding:8px 9px;border-radius:var(--r-m);color:var(--text-2);
+  transition:background .14s,color .14s;
+}
+.nav-item:hover{background:var(--bg-3);color:var(--text-1)}
+.nav-item.on{background:var(--accent-soft);color:var(--text-1);box-shadow:inset 2px 0 0 var(--accent)}
+.nav-no{
+  font:600 10px/16px var(--mono);color:var(--text-4);width:16px;flex:none;text-align:center;
+}
+.nav-item.on .nav-no{color:var(--accent-2)}
+.nav-txt{min-width:0}
+.nav-name{font-size:12.5px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-meta{font:10.5px/1.4 var(--mono);color:var(--text-4);margin-top:1px}
+.rail-foot{border-top:1px solid var(--shell-line);padding:12px 14px;font-size:10.5px;color:var(--text-4);line-height:1.6}
+.rail-foot b{color:var(--text-3);font-weight:600}
+
+/* Stage */
+.stage{display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.stage-head{
+  display:flex;align-items:center;gap:16px;padding:12px 20px;
+  border-bottom:1px solid var(--shell-line);background:var(--shell-panel);flex:none;
+}
+.stage-h1{font-size:14.5px;font-weight:650;letter-spacing:.2px}
+.stage-h1 span{color:var(--text-4);font-weight:500;font:11px var(--mono);margin-left:8px}
+.stage-p{font-size:11.5px;color:var(--text-3);margin-top:2px;max-width:760px}
+.stage-tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.tool-btn{
+  display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border:1px solid var(--shell-line);border-radius:var(--r-m);
+  font-size:11.5px;color:var(--text-2);background:var(--bg-1);
+}
+.tool-btn:hover{background:var(--bg-3);color:var(--text-1)}
+.tool-btn.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-2)}
+.stage-body{flex:1;overflow:auto;padding:20px}
+.frames{position:relative;--s:1;height:calc(920px * var(--s))}
+.frame{
+  position:absolute;top:0;left:0;width:1440px;
+  transform:scale(var(--s));transform-origin:top left;display:none;
+}
+.frame.on{display:block}
+
+/* ============================================================
+   3. 应用窗口 App（被原型展示的产品本体）
+   ============================================================ */
+.app{
+  position:relative;
+  width:1440px;height:900px;background:var(--bg-0);color:var(--text-1);
+  border:1px solid var(--line-2);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow-3);display:flex;flex-direction:column;
+  font-size:12.5px;
+}
+.tbar{
+  height:32px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;
+  background:var(--bg-1);border-bottom:1px solid var(--line);
+}
+.dots{display:flex;gap:6px}
+.dots i{width:10px;height:10px;border-radius:50%;display:block}
+.dots i:nth-child(1){background:#C9C9C9}.dots i:nth-child(2){background:#B5B5B5}.dots i:nth-child(3){background:#9D9D9D}
+.tbar-title{flex:1;text-align:center;font-size:11px;color:var(--text-3);font-weight:500}
+.tbar-r{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-3)}
+
+/* Header 48px —— 文档 14.1 */
+.hdr{
+  height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:var(--bg-1);border-bottom:1px solid var(--line);
+}
+.hdr-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.3px}
+.hdr-logo .mark{
+  width:22px;height:22px;border-radius:6px;display:grid;place-items:center;
+  background:var(--accent);color:var(--on-accent);font-size:9.5px;font-weight:800;
+}
+.ws-sel{
+  display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:var(--r-m);
+  background:var(--bg-3);border:1px solid var(--line);font-size:11.5px;color:var(--text-2);
+}
+.ws-sel:hover{background:var(--bg-4)}
+.hdr-spacer{flex:1}
+.status-chip{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:20px;
+  background:var(--bg-3);color:var(--text-1);font-size:11px;border:1px solid var(--line-2);
+}
+.status-chip.busy{background:var(--accent-soft);color:var(--accent-2)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.pulse{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.icon-btn{
+  width:28px;height:28px;border-radius:var(--r-m);display:grid;place-items:center;
+  color:var(--text-2);position:relative;
+}
+.icon-btn:hover{background:var(--bg-3);color:var(--text-1)}
+.icon-btn .badge-n{
+  position:absolute;top:2px;right:2px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;
+  background:var(--danger);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;
+}
+.avatar{
+  width:24px;height:24px;border-radius:50%;background:var(--accent);
+  color:var(--on-accent);font-size:10px;font-weight:700;display:grid;place-items:center;
+}
+
+/* 三栏主体 */
+.main{flex:1;display:flex;min-height:0}
+.side-l{width:260px;flex:none;background:var(--bg-1);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.side-r{width:320px;flex:none;background:var(--bg-1);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg-0)}
+
+/* 侧栏通用 */
+.side-top{height:40px;flex:none;display:flex;align-items:center;gap:6px;padding:0 8px;border-bottom:1px solid var(--line)}
+.search{
+  flex:1;display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:var(--r-m);
+  background:var(--bg-3);border:1px solid var(--line);color:var(--text-3);font-size:11.5px;
+}
+.search input{flex:1;background:none;border:0;outline:none;font-size:11.5px;color:var(--text-1);min-width:0}
+.search input::placeholder{color:var(--text-4)}
+.seg-tabs{display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line);flex:none}
+.seg-tab{
+  padding:4px 8px;border-radius:var(--r-s);font-size:11px;color:var(--text-3);white-space:nowrap;
+}
+.seg-tab:hover{background:var(--bg-3);color:var(--text-2)}
+.seg-tab.on{background:var(--bg-4);color:var(--text-1);font-weight:600}
+.side-scroll{flex:1;overflow-y:auto;padding:6px 8px 12px}
+.sec-label{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:10px;letter-spacing:.6px;color:var(--text-4);font-weight:700;padding:10px 6px 5px;
+}
+.sec-label .cnt{font-family:var(--mono);font-weight:400}
+
+/* 任务项 */
+.task{
+  display:flex;gap:8px;padding:7px 8px;border-radius:var(--r-m);cursor:pointer;align-items:flex-start;
+}
+.task:hover{background:var(--bg-3)}
+.task.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.task-t{font-size:12px;line-height:1.4;color:var(--text-1);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.task-m{display:flex;align-items:center;gap:6px;margin-top:3px;font:10px var(--mono);color:var(--text-4)}
+.cbx{
+  width:14px;height:14px;border-radius:3px;border:1.5px solid var(--line-2);flex:none;margin-top:2px;
+  display:grid;place-items:center;color:transparent;
+}
+.task.sel .cbx,.cbx.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.cbx.hide{visibility:hidden}
+.batch-bar{
+  display:flex;align-items:center;gap:6px;padding:6px 8px;margin:0 0 6px;
+  background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-m);
+}
+.batch-bar .n{font-size:11px;color:var(--accent-2);font-weight:600}
+.batch-bar .sp{flex:1}
+
+/* 文件树 */
+.tree-row{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:var(--r-s);cursor:pointer;font-size:12px;color:var(--text-2)}
+.tree-row:hover{background:var(--bg-3)}
+.tree-row.on{background:var(--bg-4);color:var(--text-1)}
+.tree-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-row .mut{font:10px var(--mono);color:var(--text-3);margin-left:auto}
+
+/* 编辑器区 */
+.ed-tabs{height:34px;flex:none;display:flex;background:var(--bg-1);border-bottom:1px solid var(--line);overflow:hidden}
+.ed-tab{
+  display:flex;align-items:center;gap:6px;padding:0 12px;font-size:11.5px;color:var(--text-3);
+  border-right:1px solid var(--line);white-space:nowrap;
+}
+.ed-tab.on{background:var(--bg-0);color:var(--text-1);box-shadow:inset 0 -1.5px 0 var(--accent)}
+.ed-tab .x{opacity:.5}
+.ed-tab .x:hover{opacity:1;color:var(--text-1)}
+.ed-body{flex:1;display:flex;min-height:0;background:var(--bg-0);font:12px/1.7 var(--mono);overflow:hidden}
+.gutter{flex:none;width:46px;padding:12px 0;text-align:right;color:var(--text-4);user-select:none;background:var(--bg-0)}
+.gutter div{padding-right:12px;font-size:11.5px}
+.code-pad{flex:1;padding:12px 16px;overflow:auto;white-space:pre;tab-size:2}
+.k{color:var(--text-1);font-weight:600} .s{color:var(--text-3)} .c{color:var(--text-4)} .f{color:var(--text-1)}
+.n{color:var(--text-2)} .t{color:var(--text-3)} .p{color:var(--text-2)}
+.diff-ins{background:var(--bg-3);box-shadow:inset 2px 0 0 var(--text-1);display:block;margin:0 -16px;padding:0 14px}
+.diff-del{background:var(--bg-3);box-shadow:inset 2px 0 0 var(--text-4);opacity:.85;display:block;margin:0 -16px;padding:0 14px}
+
+/* 底部面板 200px —— 文档 14.1 */
+.bottom{height:200px;flex:none;background:var(--bg-1);border-top:1px solid var(--line);display:flex;flex-direction:column}
+.bt-tabs{height:32px;flex:none;display:flex;align-items:center;gap:2px;padding:0 10px;border-bottom:1px solid var(--line)}
+.bt-tab{padding:5px 9px;font-size:11.5px;color:var(--text-3);border-radius:var(--r-s)}
+.bt-tab.on{color:var(--text-1);background:var(--bg-3);font-weight:600}
+.bt-body{flex:1;overflow:auto;padding:8px 12px;font:11.5px/1.7 var(--mono);color:var(--text-2)}
+.bt-body .prompt{color:var(--text-1);font-weight:600} .bt-body .cmd{color:var(--text-1)} .bt-body .dim{color:var(--text-4)}
+/* 状态栏 24px */
+.statusbar{
+  height:24px;flex:none;display:flex;align-items:center;gap:14px;padding:0 12px;
+  background:var(--bg-1);border-top:1px solid var(--line);font:10.5px var(--mono);color:var(--text-3);
+}
+.statusbar .sp{flex:1}
+.statusbar b{color:var(--text-2);font-weight:500}
+
+/* ============================================================
+   4. 通用组件
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 11px;
+  border-radius:var(--r-m);border:1px solid var(--line-2);background:var(--bg-3);
+  font-size:11.5px;color:var(--text-1);white-space:nowrap;transition:.14s;
+}
+.btn:hover{background:var(--bg-4)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn.ghost:hover{background:var(--bg-3);color:var(--text-1)}
+.btn.danger{color:var(--text-1);border-color:var(--line-2);background:var(--bg-3)}
+.btn.danger:hover{background:var(--bg-4)}
+.btn.sm{height:24px;padding:0 8px;font-size:11px;border-radius:var(--r-s)}
+.btn.lg{height:34px;padding:0 16px;font-size:12.5px}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:11px;
+  background:var(--bg-3);border:1px solid var(--line);font-size:10.5px;color:var(--text-2);white-space:nowrap;
+}
+.chip.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-2);font-weight:600}
+.chip.ok{background:var(--bg-3);color:var(--text-1);border-color:var(--line-2)}
+.chip.warn{background:var(--bg-3);color:var(--text-1);border-color:var(--line-2)}
+.chip.danger{background:var(--bg-1);color:var(--text-1);border:1px solid var(--text-1)}
+.chip.purple{background:var(--bg-3);color:var(--text-2);border-color:var(--line-2)}
+.chip.cyan{background:var(--bg-3);color:var(--text-2);border-color:var(--line-2)}
+.chip .x{opacity:.55;cursor:pointer}
+.chip .x:hover{opacity:1}
+
+.badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg-3);color:var(--text-3);font-weight:600;letter-spacing:.2px}
+.badge.acc{background:var(--accent-soft);color:var(--accent-2)}
+.badge.ok{background:var(--bg-3);color:var(--text-1)}
+
+.card{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-l)}
+.panel{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden}
+.panel-h{
+  height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);
+  background:var(--bg-1);font-size:12px;font-weight:600;flex:none;
+}
+.panel-h .sp{flex:1}
+.panel-b{padding:12px}
+
+.field{margin-bottom:12px}
+.field-l{display:block;font-size:11px;color:var(--text-2);margin-bottom:5px;font-weight:550}
+.field-l .req{color:var(--danger)}
+.field-hint{font-size:10.5px;color:var(--text-4);margin-top:4px;line-height:1.5}
+.input,.select,.textarea{
+  width:100%;height:30px;padding:0 9px;border-radius:var(--r-m);
+  background:var(--bg-3);border:1px solid var(--line);outline:none;font-size:12px;color:var(--text-1);
+}
+.textarea{height:auto;padding:8px 9px;resize:none;line-height:1.6}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input.mono,.textarea.mono{font-family:var(--mono);font-size:11.5px}
+.select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 14px) 13px,calc(100% - 9px) 13px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:26px}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.switch input{display:none}
+.sw{
+  width:32px;height:18px;border-radius:9px;background:var(--line-2);position:relative;flex:none;transition:.18s;
+}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--knob);transition:.18s;box-shadow:var(--shadow-1)}
+.switch input:checked + .sw{background:var(--accent)}
+.switch input:checked + .sw::after{transform:translateX(14px)}
+
+.radio{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-2)}
+.radio input{display:none}
+.rd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;display:grid;place-items:center}
+.radio input:checked + .rd{border-color:var(--accent)}
+.radio input:checked + .rd::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.radio input:checked ~ span{color:var(--text-1)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl th{
+  text-align:left;font-weight:600;color:var(--text-3);font-size:10.5px;letter-spacing:.3px;
+  padding:7px 10px;border-bottom:1px solid var(--line);background:var(--bg-1);position:sticky;top:0;
+}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:var(--bg-3)}
+.tbl .num{font-family:var(--mono);text-align:right}
+.mono{font-family:var(--mono)}
+.t-sm{font-size:11px}
+.t-dim{color:var(--text-3)}
+.t-red{color:var(--text-1);font-weight:600} .t-ok{color:var(--text-2)} .t-acc{color:var(--text-1);font-weight:600} .t-warn{color:var(--text-2)} .t-pur{color:var(--text-2)}
+
+/* Dropdown / Popover */
+.pop{
+  position:absolute;z-index:60;background:var(--bg-2);border:1px solid var(--line-2);
+  border-radius:var(--r-l);box-shadow:var(--shadow-2);overflow:hidden;
+}
+.pop-h{padding:7px 10px;font-size:10px;color:var(--text-4);letter-spacing:.5px;font-weight:700;border-bottom:1px solid var(--line)}
+.pop-i{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:11.5px;color:var(--text-2);cursor:pointer;width:100%;text-align:left}
+.pop-i:hover{background:var(--bg-3);color:var(--text-1)}
+.pop-i.on{background:var(--accent-soft);color:var(--accent-2)}
+.pop-i .mut{margin-left:auto;font:10px var(--mono);color:var(--text-4)}
+
+/* Modal */
+.mask{
+  position:absolute;inset:0;z-index:200;background:rgba(3,6,12,.62);backdrop-filter:blur(2px);
+  display:grid;place-items:center;display:none;
+}
+.mask.on{display:grid}
+.modal{
+  width:560px;max-height:calc(100% - 80px);background:var(--bg-1);border:1px solid var(--line-2);
+  border-radius:var(--r-xl);box-shadow:var(--shadow-3);display:flex;flex-direction:column;overflow:hidden;
+}
+.modal.sm{width:440px}
+.modal.lg{width:720px}
+.modal-h{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);flex:none}
+.modal-t{font-size:13.5px;font-weight:650}
+.modal-t small{display:block;font:10.5px var(--mono);color:var(--text-4);font-weight:400;margin-top:2px}
+.modal-b{padding:16px;overflow:auto}
+.modal-f{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg-1);flex:none}
+.modal-f .sp{flex:1}
+
+/* Toast */
+.toast-zone{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:20px;font-size:11.5px;
+  background:var(--bg-2);border:1px solid var(--line-2);box-shadow:var(--shadow-2);color:var(--text-1);
+}
+.toast.ok{border-color:var(--text-1);color:var(--text-1)}
+.toast.bad{border-color:var(--text-1);color:var(--text-1)}
+
+/* ============================================================
+   5. 对话面板 Chat
+   ============================================================ */
+.chat{display:flex;flex-direction:column;min-height:0;flex:1}
+.chat-h{
+  height:38px;flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border-bottom:1px solid var(--line);background:var(--bg-1);
+}
+.model-sel{
+  display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:var(--r-m);
+  background:var(--bg-3);border:1px solid var(--line);font:11px var(--mono);color:var(--text-1);
+}
+.model-sel:hover{background:var(--bg-4)}
+.chat-scroll{flex:1;overflow-y:auto;padding:14px 14px 6px}
+.msg{margin-bottom:16px;position:relative}
+.msg-r{display:flex;gap:9px}
+.av{
+  width:24px;height:24px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:10px;font-weight:700;
+}
+.av.u{background:var(--accent);color:var(--on-accent)}
+.av.a{background:var(--bg-3);color:var(--accent-2);border:1px solid var(--line-2)}
+.av.s{background:var(--warn-soft);color:var(--warn)}
+.msg-b{flex:1;min-width:0}
+.msg-who{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.msg-who .nm{font-size:11.5px;font-weight:650}
+.msg-who .tm{font:10px var(--mono);color:var(--text-4)}
+.msg-acts{margin-left:auto;display:flex;gap:2px;opacity:0;transition:.15s}
+.msg:hover .msg-acts{opacity:1}
+.mini{width:22px;height:22px;border-radius:var(--r-s);display:grid;place-items:center;color:var(--text-3)}
+.mini:hover{background:var(--bg-3);color:var(--text-1)}
+.bubble{
+  padding:9px 12px;border-radius:var(--r-l);background:var(--bg-2);border:1px solid var(--line);
+  font-size:12.5px;line-height:1.65;
+}
+.bubble.user{background:var(--accent-soft);border-color:var(--accent-line)}
+.bubble p{margin:0 0 8px}
+.bubble p:last-child{margin-bottom:0}
+.bubble ul{margin:6px 0;padding-left:18px;list-style:disc}
+.bubble li{margin:3px 0}
+.mention{
+  display:inline-flex;align-items:center;gap:3px;padding:0 5px;margin:0 1px;border-radius:4px;
+  background:var(--accent-soft);color:var(--accent-2);font:11.5px var(--mono);font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--accent-line);
+}
+.mention.mem{background:var(--bg-3);color:var(--text-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+kbd{
+  font:10.5px var(--mono);padding:1px 5px;border-radius:4px;background:var(--bg-4);
+  border:1px solid var(--line-2);color:var(--text-2);
+}
+
+/* 系统消息 */
+.sys-msg{
+  display:flex;align-items:flex-start;gap:8px;padding:8px 11px;border-radius:var(--r-m);
+  background:var(--bg-2);border:1px solid var(--line);font-size:11.5px;color:var(--text-2);margin-bottom:14px;
+}
+.sys-msg.info{border-left:2.5px solid var(--accent)}
+.sys-msg.warn{border-left:2.5px solid var(--text-1);background:var(--bg-3)}
+.sys-msg.ok{border-left:2.5px solid var(--text-1)}
+.sys-msg .sp{flex:1}
+
+/* 记忆提示 memoryHint（14.2 / 5.3.4） */
+.mem-hint{
+  display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:3px 9px 3px 7px;border-radius:20px;
+  background:var(--bg-3);border:1px solid var(--line-2);
+  font-size:10.5px;color:var(--text-2);cursor:pointer;
+}
+.mem-hint:hover{background:var(--bg-4)}
+.mem-hint b{font-weight:600}
+body.hide-mem .mem-hint{display:none}
+
+/* 工具调用卡 */
+.toolcard{
+  margin:8px 0;border:1px solid var(--line);border-radius:var(--r-m);background:var(--bg-2);overflow:hidden;
+}
+.tc-h{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:pointer;font-size:11.5px}
+.tc-h:hover{background:var(--bg-3)}
+.tc-h .nm{font:11.5px var(--mono);color:var(--text-1);font-weight:600}
+.tc-h .sp{flex:1}
+.tc-b{padding:0 10px 9px;border-top:1px solid var(--line);background:var(--bg-1)}
+.tc-b pre{
+  margin:8px 0 0;padding:8px 10px;border-radius:var(--r-s);background:var(--bg-0);border:1px solid var(--line);
+  font:11px/1.6 var(--mono);color:var(--text-2);overflow:auto;white-space:pre-wrap;word-break:break-all;
+}
+.tc-b .k{color:var(--text-1)} .tc-b .s{color:var(--text-3)}
+.toolcard[data-state="error"]{border-color:var(--line-2)}
+
+/* 代码块 */
+.codeblk{border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;margin:10px 0;background:var(--bg-1)}
+.codeblk-h{
+  display:flex;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg-1);
+  border-bottom:1px solid var(--line);font:10.5px var(--mono);color:var(--text-3);
+}
+.codeblk-h .sp{flex:1}
+.codeblk pre{margin:0;padding:10px 12px;overflow:auto;font:11.5px/1.65 var(--mono);background:var(--bg-0)}
+.codeblk pre .ln{color:var(--text-4);user-select:none;display:inline-block;width:20px;text-align:right;margin-right:12px}
+
+/* 审批卡 10.2 */
+.approve{
+  margin:10px 0;border-radius:var(--r-l);border:1px solid var(--line-2);background:var(--bg-3);overflow:hidden;
+}
+.approve.critical{border:1.5px solid var(--text-1);background:var(--bg-2)}
+.ap-h{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12px;font-weight:650}
+.ap-h .sp{flex:1}
+.ap-b{padding:0 12px 10px}
+.ap-pre{
+  background:var(--bg-0);border:1px solid var(--line);border-radius:var(--r-m);
+  padding:9px 11px;font:11px/1.65 var(--mono);color:var(--text-2);white-space:pre-wrap;
+}
+.ap-kv{display:flex;gap:8px;font-size:11px;margin-bottom:5px}
+.ap-kv .k2{color:var(--text-4);width:70px;flex:none}
+.ap-f{display:flex;align-items:center;gap:7px;padding:10px 12px;border-top:1px solid var(--line);background:var(--bg-1)}
+.ap-f .sp{flex:1}
+.approve.done{opacity:.75}
+.approve.done .ap-f{display:none}
+.ap-done{display:none;align-items:center;gap:7px;padding:9px 12px;border-top:1px solid var(--line);background:var(--bg-1);font-size:11.5px}
+.approve.done .ap-done{display:flex}
+
+/* 产物卡片 4.3 */
+.artifact{
+  display:flex;gap:11px;padding:9px;border:1px solid var(--line);border-radius:var(--r-m);
+  background:var(--bg-2);margin:10px 0;align-items:center;
+}
+.thumb{
+  width:76px;height:52px;border-radius:var(--r-s);flex:none;display:grid;place-items:center;color:#fff;font-size:9px;
+}
+.thumb.img{background:linear-gradient(135deg,#3A3A3A,#1C1C1C)}
+.thumb.vid{background:linear-gradient(135deg,#4A4A4A,#2A2A2A)}
+.thumb.ppt{background:linear-gradient(135deg,#2E2E2E,#161616)}
+.ar-b{flex:1;min-width:0}
+.ar-t{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ar-m{font:10px var(--mono);color:var(--text-4);margin-top:2px}
+.ar-a{display:flex;gap:4px;flex:none}
+
+/* 流式 */
+.typing{display:inline-block;width:7px;height:13px;background:var(--accent-2);vertical-align:-2px;animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+body.no-anim *{animation:none !important;transition:none !important}
+
+/* 输入区 */
+.composer{flex:none;border-top:1px solid var(--line);background:var(--bg-1);padding:8px 10px 10px;position:relative}
+.ctx-bar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+.ta-wrap{
+  border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg-2);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s;
+}
+.ta-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ta-wrap textarea{
+  width:100%;border:0;outline:none;background:transparent;resize:none;
+  padding:10px 12px 4px;font-size:12.5px;line-height:1.6;max-height:200px;min-height:44px;display:block;
+}
+.ta-wrap textarea::placeholder{color:var(--text-4)}
+.ta-bar{display:flex;align-items:center;gap:2px;padding:4px 6px 6px}
+.ta-bar .sp{flex:1}
+.send{
+  width:28px;height:28px;border-radius:var(--r-m);background:var(--accent);color:var(--on-accent);display:grid;place-items:center;
+}
+.send:hover{background:var(--accent-2)}
+.send[disabled]{background:var(--bg-4);color:var(--text-4)}
+.hint-line{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:var(--text-4)}
+.hint-line .sp{flex:1}
+
+/* @mention 下拉 14.2.1 */
+.mention-pop{
+  position:absolute;left:10px;right:10px;bottom:calc(100% - 6px);z-index:80;
+  background:var(--bg-2);border:1px solid var(--line-2);border-radius:var(--r-l);
+  box-shadow:var(--shadow-2);max-height:264px;overflow:auto;display:none;
+}
+.mention-pop.on{display:block}
+.mp-hint{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);
+  font-size:10.5px;color:var(--text-4);background:var(--bg-1);position:sticky;top:0;
+}
+.mp-i{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer}
+.mp-i:hover,.mp-i.on{background:var(--accent-soft)}
+.mp-i .ico{width:20px;height:20px;border-radius:var(--r-s);display:grid;place-items:center;flex:none;background:var(--bg-3);color:var(--text-2)}
+.mp-i.file .ico{color:var(--text-2)} .mp-i.skill .ico{color:var(--text-2)}
+.mp-i.conn .ico{color:var(--text-2)} .mp-i.mem .ico{color:var(--text-2)}
+.mp-i .nm{font-size:11.5px;color:var(--text-1)}
+.mp-i .ds{font-size:10px;color:var(--text-4)}
+.mp-i .ref{margin-left:auto;font:10px var(--mono);color:var(--text-4)}
+
+/* ============================================================
+   6. 屏幕：深度研究 / 模型 / 记忆 / 设置 / 插件
+   ============================================================ */
+.stage-grid{display:flex;flex:1;min-height:0}
+/* 研究 */
+.rs-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.rs-scroll{flex:1;overflow-y:auto;padding:16px 20px}
+.q-card{padding:14px 16px;border-radius:var(--r-l);background:var(--bg-2);border:1px solid var(--line);margin-bottom:14px}
+.q-t{font-size:14px;font-weight:650;line-height:1.5}
+.q-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.steps{display:flex;align-items:center;gap:0;margin:4px 0 16px}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.step .cir{
+  width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:11px var(--mono);font-weight:700;
+  background:var(--bg-3);border:1.5px solid var(--line-2);color:var(--text-4);z-index:2;
+}
+.step .lb{font-size:11px;color:var(--text-3)}
+.step.done .cir{background:var(--text-1);border-color:var(--text-1);color:var(--on-accent)}
+.step.done .lb{color:var(--text-2)}
+.step.run .cir{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.step.run .lb{color:var(--accent-2);font-weight:600}
+.step::before,.step::after{content:"";position:absolute;top:13px;height:1.5px;background:var(--line-2);z-index:1}
+.step::before{left:0;width:50%} .step::after{right:0;width:50%}
+.step:first-child::before,.step:last-child::after{display:none}
+.step.done::after{background:var(--text-1)}
+.step.done + .step::before{background:var(--text-1)}
+.progress{height:5px;border-radius:3px;background:var(--bg-3);overflow:hidden;margin-bottom:16px}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .5s}
+.src-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.src-row:last-child{border-bottom:0}
+.find-card{padding:11px 13px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--line);margin-bottom:10px}
+.find-card .t{font-size:12.5px;font-weight:600;margin-bottom:6px}
+.find-card .d{font-size:12px;color:var(--text-2);line-height:1.65}
+.cite{
+  display:inline-flex;align-items:center;gap:4px;padding:0 5px;margin:0 2px;border-radius:4px;
+  background:var(--bg-3);color:var(--text-2);font:10.5px var(--mono);font-weight:600;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line-2);
+}
+/* 模型 Provider */
+.set-grid{display:flex;flex:1;min-height:0}
+.set-nav{width:196px;flex:none;background:var(--bg-1);border-right:1px solid var(--line);padding:8px}
+.set-nav-i{
+  width:100%;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--r-m);
+  font-size:12px;color:var(--text-2);text-align:left;
+}
+.set-nav-i:hover{background:var(--bg-3);color:var(--text-1)}
+.set-nav-i.on{background:var(--accent-soft);color:var(--accent-2);font-weight:600}
+.set-main{flex:1;min-width:0;overflow-y:auto;padding:16px 20px}
+.set-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.set-h .t{font-size:16px;font-weight:700;letter-spacing:.2px}
+.set-h .d{font-size:11.5px;color:var(--text-3);margin-top:3px;max-width:680px;line-height:1.6}
+.set-h .sp{flex:1}
+.prov{
+  display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line);
+}
+.prov:last-child{border-bottom:0}
+.prov:hover{background:var(--bg-3)}
+.prov-ico{width:32px;height:32px;border-radius:var(--r-m);display:grid;place-items:center;flex:none;background:var(--bg-3);border:1px solid var(--line);font-weight:700;font-size:11px}
+.prov-b{flex:1;min-width:0}
+.prov-n{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600}
+.prov-m{font:10.5px var(--mono);color:var(--text-4);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.st-dot{width:7px;height:7px;border-radius:50%;flex:none}
+.st-dot.ok{background:var(--text-1)} .st-dot.warn{background:var(--text-3)} .st-dot.bad{background:var(--bg-0);border:1.5px solid var(--text-1)} .st-dot.off{background:var(--text-4)}
+.prov-a{display:flex;gap:4px;flex:none}
+.test-out{
+  margin-top:10px;border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;display:none;
+}
+.test-out.on{display:block}
+.test-out .h{display:flex;align-items:center;gap:7px;padding:7px 11px;background:var(--bg-1);border-bottom:1px solid var(--line);font-size:11.5px}
+.test-out .b{padding:9px 11px;font:11px/1.7 var(--mono);color:var(--text-2);background:var(--bg-0)}
+.keypool-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-bottom:1px solid var(--line);font:11px var(--mono)}
+/* 记忆 */
+.mem-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.mem-card{
+  padding:11px 12px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--line);position:relative;
+}
+.mem-card:hover{border-color:var(--line-2)}
+.mem-card:hover .mc-a{opacity:1}
+.mc-top{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.mc-c{font-size:12.5px;line-height:1.6;color:var(--text-1)}
+.mc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.mc-f{display:flex;align-items:center;gap:10px;margin-top:9px;font:10px var(--mono);color:var(--text-4)}
+.mc-a{position:absolute;top:8px;right:8px;display:flex;gap:2px;opacity:0;transition:.15s;background:var(--bg-2);padding-left:6px}
+.conf{display:flex;align-items:center;gap:6px}
+.conf-bar{width:52px;height:4px;border-radius:2px;background:var(--bg-4);overflow:hidden}
+.conf-bar i{display:block;height:100%;background:var(--text-1)}
+/* 设置项 */
+.set-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+.set-row:last-child{border-bottom:0}
+.set-row .sr-b{flex:1;min-width:0}
+.set-row .sr-t{font-size:12.5px;font-weight:550}
+.set-row .sr-d{font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.55}
+.set-row .sr-c{flex:none;display:flex;align-items:center;gap:8px}
+.set-sec{margin-bottom:20px}
+.set-sec-t{font-size:11px;letter-spacing:.6px;color:var(--text-4);font-weight:700;margin:0 0 4px}
+.set-sec-d{font-size:11px;color:var(--text-4);margin-bottom:6px}
+/* 快捷键 */
+.kb-row{display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.kb-row:hover{background:var(--bg-3)}
+.kb-name{flex:1;font-size:12px}
+.kb-name small{display:block;font-size:10.5px;color:var(--text-4);margin-top:1px}
+.keys{display:flex;gap:4px}
+.key{
+  min-width:22px;height:21px;padding:0 6px;border-radius:var(--r-s);background:var(--bg-3);
+  border:1px solid var(--line-2);border-bottom-width:2px;font:10.5px/19px var(--mono);color:var(--text-1);text-align:center;
+}
+.keys.rec .key{border-color:var(--accent);color:var(--accent-2);background:var(--accent-soft);animation:pulse 1.2s infinite}
+/* 图表 */
+.chart{display:flex;align-items:flex-end;gap:6px;height:132px;padding:0 2px}
+.chart .bar{flex:1;background:linear-gradient(180deg,var(--line-2),var(--text-2));border-radius:3px 3px 0 0;position:relative;min-height:3px}
+.chart .bar span{position:absolute;bottom:-17px;left:0;right:0;text-align:center;font:9.5px var(--mono);color:var(--text-4)}
+.metric{padding:13px 14px;border-radius:var(--r-l);background:var(--bg-2);border:1px solid var(--line)}
+.metric .l{font-size:10.5px;color:var(--text-3)}
+.metric .v{font:20px/1.3 var(--mono);font-weight:600;margin-top:4px}
+.metric .d{font-size:10.5px;color:var(--text-4);margin-top:2px}
+/* 插件 */
+.pg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.pg-card{padding:13px;border-radius:var(--r-l);background:var(--bg-2);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.pg-card:hover{border-color:var(--line-2);box-shadow:var(--shadow-1)}
+.pg-top{display:flex;gap:10px;align-items:flex-start}
+.pg-ico{width:34px;height:34px;border-radius:var(--r-m);display:grid;place-items:center;flex:none;background:var(--bg-3);color:var(--accent-2);border:1px solid var(--line)}
+.pg-n{font-size:12.5px;font-weight:650}
+.pg-a{font:10px var(--mono);color:var(--text-4);margin-top:1px}
+.pg-d{font-size:11.5px;color:var(--text-2);line-height:1.6;flex:1}
+.pg-f{display:flex;align-items:center;gap:8px}
+.pg-f .sp{flex:1}
+.pg-stat{font:10px var(--mono);color:var(--text-4)}
+
+/* ============================================================
+   7. 标注（原型说明气泡）
+   ============================================================ */
+.anno{position:absolute;z-index:150}
+.anno-dot{
+  width:19px;height:19px;border-radius:50%;background:var(--text-1);color:var(--on-accent);
+  font:600 10.5px/19px var(--mono);text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35);
+  cursor:help;display:grid;place-items:center;
+}
+.anno-pop{
+  position:absolute;top:24px;left:0;width:246px;padding:9px 11px;border-radius:var(--r-m);
+  background:var(--bg-2);border:1px solid var(--text-1);box-shadow:var(--shadow-2);
+  font-size:11px;line-height:1.6;color:var(--text-1);display:none;z-index:151;
+}
+.anno:hover .anno-pop{display:block}
+.anno-pop b{color:var(--text-1)}
+.anno-pop .src{display:block;margin-top:5px;font:10px var(--mono);color:var(--text-4)}
+body.anno-on .anno{display:block}
+body .anno{display:none}
+
+/* 紧凑模式 */
+body.compact .app{--r-l:6px;--r-m:4px}
+body.compact .msg{margin-bottom:10px}
+body.compact .bubble{padding:7px 10px;line-height:1.5}
+body.compact .set-row{padding:7px 0}
+body.compact .prov{padding:8px 13px}
+/* 详细日志（通用设置开关联动） */
+.detail-log{display:none}
+body.show-log .detail-log{display:block}
+</style>
+</head>
+<body>
+
+<!-- SVG 图标精灵 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.3 3.3"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5l3 3v9.4H4z"/><path d="M9 1.8v3h3"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.2h3.8l1.2 1.6H14v7.4H2z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.4" r="1.5"/><circle cx="4.5" cy="12.6" r="1.5"/><circle cx="11.5" cy="4.2" r="1.5"/><path d="M4.5 4.9v6.2M11.5 5.7v1.4c0 1.6-1.3 2.9-2.9 2.9H7"/></symbol>
+<symbol id="i-list" viewBox="0 0 16 16"><path d="M6 4h8M6 8h8M6 12h8M2.6 4h.01M2.6 8h.01M2.6 12h.01"/></symbol>
+<symbol id="i-outline" viewBox="0 0 16 16"><path d="M2.5 4h4M9 4h4.5M2.5 8h4M9 8h4.5M2.5 12h4M9 12h4.5"/></symbol>
+<symbol id="i-cube" viewBox="0 0 16 16"><path d="M8 1.8l5.2 2.7v6L8 14.2 2.8 10.5v-6z"/><path d="M2.8 4.5L8 7.2l5.2-2.7M8 7.2v7"/></symbol>
+<symbol id="i-term" viewBox="0 0 16 16"><rect x="2" y="2.8" width="12" height="10.4" rx="1.6"/><path d="M4.6 6.6l1.9 1.9-1.9 1.9M8.8 10.6h2.6"/></symbol>
+<symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.6l5.8 10.8H2.2z"/><path d="M8 6.4v3M8 11.3v.4"/></symbol>
+<symbol id="i-bell" viewBox="0 0 16 16"><path d="M4.2 6.6a3.8 3.8 0 017.6 0c0 2.4-1 3.4-1 4H5.2s-1-1.6-1-4z"/><path d="M6.6 12.6a1.6 1.6 0 002.8 0"/></symbol>
+<symbol id="i-set" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4"/></symbol>
+<symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.6" r="2.6"/><path d="M3 13.8c0-2.8 2.2-4.3 5-4.3s5 1.5 5 4.3"/></symbol>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.4v9.2M3.4 8h9.2"/></symbol>
+<symbol id="i-send" viewBox="0 0 16 16"><path d="M13.6 2.4L2.2 7.7l4.3 1.6L8 13.6z"/><path d="M6.5 9.3l7.1-6.9"/></symbol>
+<symbol id="i-clip" viewBox="0 0 16 16"><path d="M13.2 7.4l-5.3 5.3a2.9 2.9 0 01-4.1-4.1l5.4-5.4a1.9 1.9 0 012.7 2.7l-5.4 5.4a.9.9 0 01-1.3-1.3l4.8-4.8"/></symbol>
+<symbol id="i-code" viewBox="0 0 16 16"><path d="M5.8 5L3 8l2.8 3M10.2 5L13 8l-2.8 3"/></symbol>
+<symbol id="i-at" viewBox="0 0 16 16"><circle cx="7.6" cy="8" r="2.4"/><path d="M10 10.2v1.7a1.8 1.8 0 003.6 0V8a6 6 0 10-2.4 4.8"/></symbol>
+<symbol id="i-layers" viewBox="0 0 16 16"><path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8.6l6 3 6-3M2 11.6l6 3 6-3"/></symbol>
+<symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.6l3.1 3.1 6.5-7.2"/></symbol>
+<symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.6" y="5.6" width="8" height="8" rx="1.4"/><path d="M10.4 3.4H4a1.4 1.4 0 00-1.4 1.4v6.4"/></symbol>
+<symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2.6v7.2M5 7l3 3 3-3M3 13.2h10"/></symbol>
+<symbol id="i-up" viewBox="0 0 16 16"><path d="M8 11V3.8M5 6.8l3-3 3 3M3 13.2h10"/></symbol>
+<symbol id="i-share" viewBox="0 0 16 16"><circle cx="12" cy="3.6" r="1.6"/><circle cx="4" cy="8" r="1.6"/><circle cx="12" cy="12.4" r="1.6"/><path d="M5.4 7.1l5.2-2.5M5.4 8.9l5.2 2.5"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 11-1.9-3.9"/><path d="M13.2 2.4v2.6h-2.6"/></symbol>
+<symbol id="i-play" viewBox="0 0 16 16"><path d="M5 3.4l7 4.6-7 4.6z"/></symbol>
+<symbol id="i-stop" viewBox="0 0 16 16"><rect x="4.4" y="4.4" width="7.2" height="7.2" rx="1.2"/></symbol>
+<symbol id="i-edit" viewBox="0 0 16 16"><path d="M11.2 2.6l2.2 2.2L5 13.2H2.8V11z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.4h10M6.2 4.4V3h3.6v1.4M4.5 4.4l.7 8.8h5.6l.7-8.8"/></symbol>
+<symbol id="i-archive" viewBox="0 0 16 16"><rect x="2.4" y="2.8" width="11.2" height="3" rx="1"/><path d="M4 5.8v7.4h8V5.8M6.6 8.4h2.8"/></symbol>
+<symbol id="i-key" viewBox="0 0 16 16"><circle cx="5.2" cy="8" r="2.6"/><path d="M7.8 8h6M11.6 8v2.4M13.6 8v1.8"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.2l5 1.9v4.3c0 2.9-2.1 4.7-5 5.4-2.9-.7-5-2.5-5-5.4V4.1z"/><path d="M6 8l1.6 1.6L10.4 6.8"/></symbol>
+<symbol id="i-plugin" viewBox="0 0 16 16"><path d="M6 2.4h4v2.2H6z"/><path d="M4 4.6h8v3.2a4 4 0 01-8 0zM8 11.8v2"/></symbol>
+<symbol id="i-brain" viewBox="0 0 16 16"><path d="M8 2.6c-1.9 0-3.2 1.4-3.2 3.2 0 .8.3 1.6.8 2.1-.6.4-1 1-1 1.8 0 1.5 1.5 2.4 3.4 2.4s3.4-.9 3.4-2.4c0-.8-.4-1.4-1-1.8.5-.5.8-1.3.8-2.1 0-1.8-1.3-3.2-3.2-3.2z"/><path d="M8 2.6v9.5"/></symbol>
+<symbol id="i-image" viewBox="0 0 16 16"><rect x="2.2" y="3" width="11.6" height="10" rx="1.4"/><circle cx="5.8" cy="6.4" r="1"/><path d="M3 11.6l3-2.8 2.4 2.4 1.8-1.8 2.8 2.6"/></symbol>
+<symbol id="i-video" viewBox="0 0 16 16"><rect x="2" y="4" width="8.4" height="8" rx="1.4"/><path d="M10.4 6.9l3.6-2.2v6.6l-3.6-2.2z"/></symbol>
+<symbol id="i-ppt" viewBox="0 0 16 16"><rect x="2" y="2.8" width="12" height="9" rx="1.4"/><path d="M8 11.8v1.6M5.6 14.2h4.8"/></symbol>
+<symbol id="i-cdown" viewBox="0 0 16 16"><path d="M4 6.4l4 4 4-4"/></symbol>
+<symbol id="i-cright" viewBox="0 0 16 16"><path d="M6.4 4l4 4-4 4"/></symbol>
+<symbol id="i-globe" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6"/><path d="M2.4 8h11.2M8 2.4c1.9 2 2.9 3.6 2.9 5.6S9.9 11.6 8 13.6C6.1 11.6 5.1 10 5.1 8S6.1 4.4 8 2.4z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8v3.4l2.2 1.3"/></symbol>
+<symbol id="i-db" viewBox="0 0 16 16"><ellipse cx="8" cy="4.2" rx="5" ry="1.9"/><path d="M3 4.2v7.6c0 1.1 2.2 1.9 5 1.9s5-.8 5-1.9V4.2M3 8c0 1.1 2.2 1.9 5 1.9s5-.8 5-1.9"/></symbol>
+<symbol id="i-filter" viewBox="0 0 16 16"><path d="M2.6 3.6h10.8L9.2 8.8v4.4L6.8 12V8.8z"/></symbol>
+<symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6"/><path d="M8 7.2v3.6M8 5.2v.4"/></symbol>
+<symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 2.2l1.4 3.7L13 7.3l-3.6 1.4L8 12.4 6.6 8.7 3 7.3l3.6-1.4z"/><path d="M12.6 11.2l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1.4v1.6M8 13v1.6M1.4 8h1.6M13 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1"/></symbol>
+<symbol id="i-moon" viewBox="0 0 16 16"><path d="M12.6 9.6A5.6 5.6 0 016.4 3.4 5.6 5.6 0 1012.6 9.6z"/></symbol>
+<symbol id="i-tag" viewBox="0 0 16 16"><path d="M8.4 2.4H13v4.6l-6 6-4.6-4.6z"/><circle cx="10.6" cy="5.4" r=".9"/></symbol>
+<symbol id="i-eye" viewBox="0 0 16 16"><path d="M8 4c3 0 5.5 2.2 6 4-.5 1.8-3 4-6 4s-5.5-2.2-6-4c.5-1.8 3-4 6-4z"/><circle cx="8" cy="8" r="1.8"/></symbol>
+<symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.4" y="7" width="9.2" height="6.4" rx="1.4"/><path d="M5.6 7V5.6a2.4 2.4 0 014.8 0V7"/></symbol>
+<symbol id="i-flow" viewBox="0 0 16 16"><rect x="1.8" y="6.2" width="3.6" height="3.6" rx="1"/><rect x="10.6" y="2.4" width="3.6" height="3.4" rx="1"/><rect x="10.6" y="10.2" width="3.6" height="3.4" rx="1"/><path d="M5.4 8h2.4v-4h2.8M7.8 8v4h2.8"/></symbol>
+<symbol id="i-more" viewBox="0 0 16 16"><circle cx="3.4" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="12.6" cy="8" r="1"/></symbol>
+<symbol id="i-history" viewBox="0 0 16 16"><path d="M2.8 8a5.2 5.2 0 105.2-5.2A5.2 5.2 0 003 5.6"/><path d="M2.6 2.8v3h3M8 5.4V8l2.2 1.4"/></symbol>
+</defs>
+</svg>
+
+<div class="shell">
+  <!-- 原型导航轨 -->
+  <aside class="rail">
+    <div class="rail-brand">
+      <div class="rail-logo">
+        <div class="rail-mark">DSH</div>
+        <div>
+          <div class="rail-title">智能体客户端原型</div>
+          <div class="rail-sub">deepseek-harness · V1</div>
+        </div>
+      </div>
+      <div class="rail-tag"><svg class="ic ic-s"><use href="#i-file"/></svg>依据《DeepSeek-harness智能体客户端.md》V3.6</div>
+    </div>
+    <nav class="rail-nav" id="railNav">
+      <div class="rail-label">SCREENS</div>
+      <button class="nav-item on" data-go="chat"><span class="nav-no">01</span><span class="nav-txt"><span class="nav-name">AI 对话（主形态）</span><span class="nav-meta">14.2 AIChatPanel</span></span></button>
+      <button class="nav-item" data-go="workspace"><span class="nav-no">02</span><span class="nav-txt"><span class="nav-name">主工作区 · IDE（副形态）</span><span class="nav-meta">14.1 MainLayout</span></span></button>
+      <button class="nav-item" data-go="research"><span class="nav-no">03</span><span class="nav-txt"><span class="nav-name">深度研究工作流</span><span class="nav-meta">§7 Deep Research</span></span></button>
+      <button class="nav-item" data-go="models"><span class="nav-no">04</span><span class="nav-txt"><span class="nav-name">模型 Provider 与 Key</span><span class="nav-meta">§2.7 / §2.8</span></span></button>
+      <button class="nav-item" data-go="memory"><span class="nav-no">05</span><span class="nav-txt"><span class="nav-name">长期记忆管理</span><span class="nav-meta">§5.3 LongTermMemory</span></span></button>
+      <button class="nav-item" data-go="settings"><span class="nav-no">06</span><span class="nav-txt"><span class="nav-name">设置中心</span><span class="nav-meta">§14.3 / §14.4 / §10 / §12</span></span></button>
+      <button class="nav-item" data-go="plugins"><span class="nav-no">07</span><span class="nav-txt"><span class="nav-name">插件市场</span><span class="nav-meta">§9 PluginSystem</span></span></button>
+    </nav>
+    <div class="rail-foot">
+      <b>说明</b>：本原型为静态高保真演示，数据为示例。可点击的交互已实现，未实现的元素仅作视觉占位。<br>
+      主形态为「对话居中」（01）；「主工作区 · IDE」为副形态（02），其尺寸严格遵循文档：header 48px / 左栏 260 / 右栏 320 / 底栏 200 / 状态栏 24。
+    </div>
+  </aside>
+
+  <!-- 演示区 -->
+  <main class="stage">
+    <header class="stage-head">
+      <div>
+        <h1 class="stage-h1" id="scTitle">AI 对话（主形态） <span>14.2</span></h1>
+        <p class="stage-p" id="scDesc">对话居中主形态：@提及下拉（文件 / 技能 / 连接器 / 记忆）、上下文条、工具调用卡、代码块、高风险审批卡、产物卡片与流式生成状态；左右侧栏为会话列表与 Agent 任务 / 工具输出 / 上下文查看器。</p>
+      </div>
+      <div class="stage-tools">
+        <button class="tool-btn" id="btnAnno"><svg class="ic ic-s"><use href="#i-tag"/></svg>设计标注</button>
+        <button class="tool-btn" id="btnTheme"><svg class="ic ic-s"><use href="#i-sun"/></svg>浅色</button>
+      </div>
+    </header>
+    <div class="stage-body">
+      <div class="frames" id="frames">
+        <!-- ========== 01 主工作区 ========== -->
+        <section class="frame" data-screen="workspace">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — ~/projects/kb-rag</div>
+            <div class="tbar-r"><span class="badge ok">Local-First</span><span>MIT</span></div>
+          </div>
+
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <button class="ws-sel"><svg class="ic ic-s"><use href="#i-folder"/></svg>kb-rag <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+            <span class="chip"><svg class="ic ic-s"><use href="#i-branch"/></svg>main</span>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip"><svg class="ic ic-s"><use href="#i-spark"/></svg>Agent 空闲</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg><span class="badge-n">2</span></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-set"/></svg></button>
+            <div class="avatar">U</div>
+          </header>
+
+          <div class="main">
+            <!-- 左侧栏 260px -->
+            <aside class="side-l">
+              <div class="side-top">
+                <label class="search"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索文件 / 任务…"></label>
+                <button class="icon-btn"><svg class="ic"><use href="#i-plus"/></svg></button>
+              </div>
+              <div class="seg-tabs" data-seg="lside">
+                <button class="seg-tab on" data-pane="task">任务</button>
+                <button class="seg-tab" data-pane="file">文件</button>
+                <button class="seg-tab" data-pane="git">Git</button>
+                <button class="seg-tab" data-pane="search">搜索</button>
+                <button class="seg-tab" data-pane="outline">大纲</button>
+                <button class="seg-tab" data-pane="dep">依赖</button>
+              </div>
+              <div class="side-scroll">
+                <!-- 任务 -->
+                <div class="pane" data-pane="task">
+                  <div class="sec-label"><span>进行中 · 3</span><button class="btn sm ghost" data-toggle-batch>批量</button></div>
+                  <div class="batch-bar" id="batchBar" style="display:none">
+                    <span class="n">已选 <b id="selCnt">0</b> 项</span><span class="sp"></span>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-archive"/></svg>归档</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-up"/></svg>导出</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-share"/></svg>分享</button>
+                    <button class="btn sm danger"><svg class="ic ic-s"><use href="#i-trash"/></svg>删除</button>
+                  </div>
+                  <div class="task on"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">重构 AuthService 的 Token 刷新逻辑并补充单测</div><div class="task-m"><span class="badge acc">CodeGen</span><span>12 分钟前</span><span>· 8 步</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">排查 kb-rag 检索召回率下降问题</div><div class="task-m"><span class="badge">DebugHelper</span><span>1 小时前</span><span>· 进行中</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">为 StorageService 生成 API 文档</div><div class="task-m"><span class="badge">DocWriter</span><span>昨天</span><span>· 待审批</span></div></div></div>
+                  <div class="sec-label"><span>已完成 · 12</span><span class="cnt">查看全部</span></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">升级 Milvus SDK 至 2.4 并修复连接泄漏</div><div class="task-m"><span class="badge ok">完成</span><span>2 天前</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">调研 RAG 框架对比并生成报告</div><div class="task-m"><span class="badge ok">完成</span><span>3 天前</span><span>· 3 个产物</span></div></div></div>
+                </div>
+                <!-- 文件 -->
+                <div class="pane" data-pane="file" hidden>
+                  <div class="sec-label"><span>资源管理器</span><span class="cnt">⌘P</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-folder"/></svg><span class="nm">src</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s"><use href="#i-folder"/></svg><span class="nm">services</span></div>
+                  <div class="tree-row on" style="padding-left:34px"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">auth.service.ts</span><span class="mut">M</span></div>
+                  <div class="tree-row" style="padding-left:34px"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">storage.service.ts</span></div>
+                  <div class="tree-row" style="padding-left:34px"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">retrieval.service.ts</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s"><use href="#i-folder"/></svg><span class="nm">core</span></div>
+                  <div class="tree-row" style="padding-left:34px"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">config.ts</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">main.ts</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-folder"/></svg><span class="nm">tests</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">package.json</span></div>
+                </div>
+                <!-- Git -->
+                <div class="pane" data-pane="git" hidden>
+                  <div class="sec-label"><span>更改 · 4</span><span class="cnt">main ↑2</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-file"/></svg><span class="nm">src/services/auth.service.ts</span><span class="mut">M</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-file"/></svg><span class="nm">src/core/config.ts</span><span class="mut">M</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-file"/></svg><span class="nm">tests/auth.spec.ts</span><span class="mut">A</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-red"><use href="#i-file"/></svg><span class="nm">src/legacy/token.ts</span><span class="mut" style="color:var(--danger)">D</span></div>
+                  <div class="sec-label"><span>最近提交</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-check"/></svg><span class="nm">feat: LLMLingua 侧车压缩</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-check"/></svg><span class="nm">fix: 空查询导致的向量异常</span></div>
+                </div>
+                <!-- 搜索 -->
+                <div class="pane" data-pane="search" hidden>
+                  <div class="sec-label"><span>结果 · 8（用时 42ms）</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">auth.service.ts:48</span></div>
+                  <div style="padding:2px 6px 6px 22px;font:10.5px/1.5 var(--mono);color:var(--text-4)">refreshToken(): 缓存未命中时未加锁</div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">config.ts:12</span></div>
+                  <div style="padding:2px 6px 6px 22px;font:10.5px/1.5 var(--mono);color:var(--text-4)">TIMEOUT_MS = 30000</div>
+                </div>
+                <!-- 大纲 -->
+                <div class="pane" data-pane="outline" hidden>
+                  <div class="sec-label"><span>符号 · auth.service.ts</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-acc"><use href="#i-cube"/></svg><span class="nm">AuthService</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s t-pur"><use href="#i-flow"/></svg><span class="nm">login()</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s t-pur"><use href="#i-flow"/></svg><span class="nm">refreshToken()</span></div>
+                  <div class="tree-row" style="padding-left:20px"><svg class="ic ic-s t-pur"><use href="#i-flow"/></svg><span class="nm">verify()</span></div>
+                </div>
+                <!-- 依赖 -->
+                <div class="pane" data-pane="dep" hidden>
+                  <div class="sec-label"><span>运行时依赖 · 21</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-cube"/></svg><span class="nm">@milvus-io/milvus-sdk</span><span class="mut">2.4.2</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-cube"/></svg><span class="nm">cordis</span><span class="mut">3.18.0</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-cube"/></svg><span class="nm">zod</span><span class="mut">3.23.8</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-cube"/></svg><span class="nm">express</span><span class="mut" style="color:var(--warn)">可升级 5.x</span></div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- 中央编辑区 -->
+            <div class="center">
+              <div class="ed-tabs">
+                <div class="ed-tab on"><svg class="ic ic-s t-acc"><use href="#i-file"/></svg>auth.service.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></div>
+                <div class="ed-tab"><svg class="ic ic-s t-dim"><use href="#i-file"/></svg>config.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></div>
+                <div class="ed-tab"><svg class="ic ic-s t-dim"><use href="#i-file"/></svg>auth.spec.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></div>
+              </div>
+              <div class="ed-body">
+                <div class="gutter">
+                  <div>42</div><div>43</div><div>44</div><div>45</div><div>46</div><div>47</div><div>48</div><div>49</div><div>50</div><div>51</div><div>52</div><div>53</div><div>54</div><div>55</div><div>56</div><div>57</div><div>58</div><div>59</div><div>60</div><div>61</div>
+                </div>
+                <div class="code-pad"><span class="c">// Token 刷新：单飞 + 指数退避，避免并发击穿</span>
+<span class="k">async</span> <span class="f">refreshToken</span>(<span class="p">sessionId</span>: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">Token</span>&gt; {
+  <span class="k">const</span> cached = <span class="k">this</span>.<span class="f">cache</span>.<span class="f">get</span>(sessionId);
+  <span class="k">if</span> (cached &amp;&amp; !<span class="f">isStale</span>(cached)) <span class="k">return</span> cached;
+<span class="diff-del">  <span class="k">return</span> <span class="k">await</span> <span class="k">this</span>.<span class="f">request</span>(<span class="s">'/auth/refresh'</span>, { sessionId });</span>
+<span class="diff-ins">  <span class="c">// 单飞：同一 session 的并发刷新复用同一个 Promise</span></span>
+<span class="diff-ins">  <span class="k">return</span> <span class="k">this</span>.<span class="f">singleFlight</span>.<span class="f">run</span>(sessionId, () =&gt;</span>
+<span class="diff-ins">    <span class="k">this</span>.<span class="f">withRetry</span>(() =&gt; <span class="k">this</span>.<span class="f">request</span>(<span class="s">'/auth/refresh'</span>, { sessionId }), {</span>
+<span class="diff-ins">      <span class="p">retries</span>: <span class="n">3</span>,</span>
+<span class="diff-ins">      <span class="p">baseDelayMs</span>: <span class="n">200</span>,</span>
+<span class="diff-ins">      <span class="p">timeoutMs</span>: <span class="k">this</span>.<span class="p">config</span>.<span class="p">refreshTimeoutMs</span>,</span>
+<span class="diff-ins">    })</span>
+<span class="diff-ins">  );</span>
+}</div>
+              </div>
+            </div>
+
+            <!-- 右侧 AI 对话面板 320px -->
+            <aside class="side-r">
+              <div class="chat-h">
+                <button class="model-sel"><svg class="ic ic-s"><use href="#i-layers"/></svg>deepseek:deepseek-chat <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+                <div style="flex:1"></div>
+                <button class="icon-btn"><svg class="ic"><use href="#i-plus"/></svg></button>
+                <button class="icon-btn"><svg class="ic"><use href="#i-more"/></svg></button>
+              </div>
+              <div class="chat-scroll">
+                <div class="sys-msg info"><svg class="ic ic-s t-acc"><use href="#i-info"/></svg><span>已加载工作区上下文：3 个文件 · 可用工具 42</span><span class="sp"></span><button class="mini"><svg class="ic ic-s"><use href="#i-x"/></svg></button></div>
+
+                <div class="msg"><div class="msg-r">
+                  <div class="av u">我</div>
+                  <div class="msg-b">
+                    <div class="msg-who"><span class="nm">我</span><span class="tm">14:02</span></div>
+                    <div class="bubble user">这里的 refreshToken 并发会重复请求，帮我改成单飞 + 退避重试</div>
+                  </div></div></div>
+
+                <div class="msg"><div class="msg-r">
+                  <div class="av a"><svg class="ic ic-s"><use href="#i-spark"/></svg></div>
+                  <div class="msg-b">
+                    <div class="msg-who"><span class="nm">Harness</span><span class="badge acc">主 Agent</span><span class="tm">14:02</span><span class="msg-acts">
+                      <button class="mini"><svg class="ic ic-s"><use href="#i-refresh"/></svg></button>
+                      <button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button>
+                      <button class="mini"><svg class="ic ic-s"><use href="#i-share"/></svg></button></span></div>
+                    <div class="bubble">
+                      <p>已定位到 <span class="mention">@/src/services/auth.service.ts</span> 第 47 行：缓存未命中时直接发起请求，无并发保护。改为单飞 + 指数退避：</p>
+                      <ul><li>同一 <code class="mono">sessionId</code> 并发刷新复用同一 Promise</li><li>失败按 200ms → 400ms → 800ms 退避，最多 3 次</li><li>超时时间改为读取 <code class="mono">config.refreshTimeoutMs</code></li></ul>
+                      <div class="mem-hint"><svg class="ic ic-s"><use href="#i-brain"/></svg>基于记忆：<b>[偏好]</b> 用户偏好简洁代码 + 显式超时配置</div>
+                    </div>
+                    <div class="toolcard" data-state="ok">
+                      <div class="tc-h" data-toggle-tc><span class="badge ok">已完成</span><span class="nm">edit_file</span><span class="sp"></span><span class="t-dim t-sm">auth.service.ts · 0.4s</span><svg class="ic ic-s"><use href="#i-cdown"/></svg></div>
+                      <div class="tc-b" hidden><pre><span class="k">"path"</span>: <span class="s">"src/services/auth.service.ts"</span>
+<span class="k">"edits"</span>: <span class="s">"1 处替换，+6 / -1 行"</span>
+<span class="k">"dryRun"</span>: <span class="s">false</span></pre></div>
+                    </div>
+                    <div class="codeblk">
+                      <div class="codeblk-h"><svg class="ic ic-s"><use href="#i-code"/></svg>auth.service.ts<span class="sp"></span>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-check"/></svg></button>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-play"/></svg></button></div>
+                      <pre><span class="ln">48</span><span class="k">return</span> <span class="k">this</span>.<span class="f">singleFlight</span>.<span class="f">run</span>(sessionId, () =&gt; <span class="k">this</span>.<span class="f">withRetry</span>(…));
+<span class="ln">49</span><span class="c">// 已应用 · 3 处引用同步更新</span></pre>
+                    </div>
+                  </div></div></div>
+
+                <div class="msg">
+                  <div class="approve" data-approve>
+                    <div class="ap-h"><svg class="ic"><use href="#i-warn"/></svg>需要审批 · 高风险操作<span class="sp"></span><span class="chip danger">high</span></div>
+                    <div class="ap-b">
+                      <div class="ap-kv"><span class="k2">工具</span><span class="mono">git_tools.git_push</span></div>
+                      <div class="ap-kv"><span class="k2">预估成本</span><span class="mono t-dim">费用未知 <span class="t-dim">· 该模型未配置单价，可在设置中补充</span></span></div>
+                      <div class="ap-pre">$ git push origin main
+↑ 3 commits · 2 files changed, +18 −4</div>
+                    </div>
+                    <div class="ap-f">
+                      <button class="btn sm" data-approve-act="deny">拒绝</button>
+                      <button class="btn sm" data-approve-act="edit">编辑参数</button>
+                      <button class="btn sm" data-approve-act="always">始终允许</button>
+                      <span class="sp"></span>
+                      <button class="btn sm primary" data-approve-act="once">允许一次</button>
+                    </div>
+                    <div class="ap-done"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="ap-done-t">已允许（仅本次）</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="composer">
+                <div class="ctx-bar">
+                  <span class="chip"><svg class="ic ic-s"><use href="#i-file"/></svg>auth.service.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                  <span class="chip"><svg class="ic ic-s"><use href="#i-file"/></svg>config.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                  <span class="chip purple"><svg class="ic ic-s"><use href="#i-brain"/></svg>2 条记忆<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                  <button class="btn sm ghost">清空</button>
+                </div>
+                <div class="ta-wrap">
+                  <textarea rows="2" placeholder="输入消息…（输入 @ 可提及文件 / 技能 / 连接器 / 记忆）"></textarea>
+                  <div class="ta-bar">
+                    <button class="icon-btn"><svg class="ic"><use href="#i-clip"/></svg></button>
+                    <button class="icon-btn"><svg class="ic"><use href="#i-code"/></svg></button>
+                    <button class="icon-btn"><svg class="ic"><use href="#i-layers"/></svg></button>
+                    <button class="icon-btn"><svg class="ic"><use href="#i-at"/></svg></button>
+                    <span class="sp"></span>
+                    <span class="chip">CodeGen</span>
+                    <button class="send"><svg class="ic ic-s"><use href="#i-send"/></svg></button>
+                  </div>
+                </div>
+                <div class="hint-line"><span><kbd>Enter</kbd> 发送</span><span><kbd>Shift+Enter</kbd> 换行</span><span><kbd>@</kbd> 提及</span><span class="sp"></span><span>Esc 取消生成</span></div>
+              </div>
+            </aside>
+          </div>
+
+          <!-- 底部面板 200px -->
+          <div class="bottom">
+            <div class="bt-tabs">
+              <button class="bt-tab on">终端</button>
+              <button class="bt-tab">问题 <span class="badge">2</span></button>
+              <button class="bt-tab">输出</button>
+              <button class="bt-tab">调试控制台</button>
+              <div style="flex:1"></div>
+              <button class="icon-btn"><svg class="ic ic-s"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="bt-body">
+              <div><span class="prompt">~/projects/kb-rag $</span> <span class="cmd">pnpm test auth</span></div>
+              <div class="dim">✓ tests/auth.spec.ts (9 passed, 124ms)</div>
+              <div class="dim">✓ coverage: statements 92.4% | branches 86.1%</div>
+              <div><span class="prompt">~/projects/kb-rag $</span> <span class="cmd">dsh model list</span></div>
+              <div class="dim">deepseek:deepseek-chat   ● 已连通   328ms</div>
+              <div class="dim">zhipu:glm-4-plus         ● 已连通   512ms</div>
+              <div class="dim">openai-compat:local-llm  ○ 未测试</div>
+            </div>
+          </div>
+
+          <div class="statusbar">
+            <span><svg class="ic ic-s" style="vertical-align:-2px"><use href="#i-branch"/></svg> main</span>
+            <span>TypeScript</span><span>UTF-8</span><span>LF</span><span>行 48，列 12</span>
+            <span class="sp"></span>
+            <span><b>插件</b> 18 个已启用</span>
+            <span><svg class="ic ic-s" style="vertical-align:-2px"><use href="#i-spark"/></svg> <b>Harness</b> 空闲</span>
+          </div>
+
+          <!-- 设计标注 -->
+          <div class="anno" style="top:56px;left:300px"><div class="anno-dot">1</div><div class="anno-pop"><b>顶栏 48px</b>：Logo / 工作区选择 / Agent 状态 / 通知 / 设置 / 用户。层级徽标为自部署开关，非付费套餐。<span class="src">§14.1 MainLayout.header · §12.2</span></div></div>
+          <div class="anno" style="top:120px;left:262px"><div class="anno-dot">2</div><div class="anno-pop"><b>左侧栏 260px</b>：任务 / 文件 / Git / 搜索 / 大纲 / 依赖六个分区。任务区支持多选批量删除·归档·导出·分享。<span class="src">§14.1 leftSidebar · §14.2.4</span></div></div>
+          <div class="anno" style="top:150px;right:326px"><div class="anno-dot">3</div><div class="anno-pop"><b>右侧栏 320px</b>：AI 对话面板。含模型切换、工具调用卡、审批卡、上下文条、@提及。<span class="src">§14.1 rightSidebar · §14.2</span></div></div>
+          <div class="anno" style="bottom:228px;left:420px"><div class="anno-dot">4</div><div class="anno-pop"><b>底部面板 200px</b>：终端 / 问题 / 输出 / 调试控制台，与 CLI 共用同一套命令。<span class="src">§14.1 bottomPanel</span></div></div>
+          <div class="anno" style="bottom:6px;right:200px"><div class="anno-dot">5</div><div class="anno-pop"><b>状态栏 24px</b>：分支 / 语言 / 编码 / 行列 / 插件数 / Agent 状态。<span class="src">§14.1 statusBar</span></div></div>
+        </div>
+        </section>
+
+        <!-- ========== 02 AI 对话面板 ========== -->
+        <section class="frame on" data-screen="chat">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 对话 · 重构 Token 刷新逻辑</div>
+            <div class="tbar-r"><span class="chip ok"><svg class="ic ic-s"><use href="#i-lock"/></svg>本地加密</span></div>
+          </div>
+
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <button class="ws-sel"><svg class="ic ic-s"><use href="#i-folder"/></svg>kb-rag <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip busy"><span class="dot pulse"></span>Harness 正在生成…</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg><span class="badge-n">2</span></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-set"/></svg></button>
+            <div class="avatar">U</div>
+          </header>
+
+          <div class="main">
+            <!-- 左：会话 / 任务 -->
+            <aside class="side-l">
+              <div class="side-top">
+                <label class="search"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索会话…"></label>
+                <button class="icon-btn"><svg class="ic"><use href="#i-plus"/></svg></button>
+              </div>
+              <div class="seg-tabs" data-seg="chatL">
+                <button class="seg-tab on" data-pane="sess">会话</button>
+                <button class="seg-tab" data-pane="tasks">任务</button>
+                <button class="seg-tab" data-pane="art">产物</button>
+              </div>
+              <div class="side-scroll">
+                <div class="pane" data-pane="sess">
+                  <div class="sec-label"><span>今天</span></div>
+                  <div class="task on"><div><div class="task-t">重构 Token 刷新逻辑并补充单测</div><div class="task-m"><span class="badge acc">进行中</span><span>14:02</span><span>· 12 条</span></div></div></div>
+                  <div class="task"><div><div class="task-t">Milvus 连接池参数调优建议</div><div class="task-m"><span>11:20</span><span>· 6 条</span></div></div></div>
+                  <div class="sec-label"><span>昨天</span></div>
+                  <div class="task"><div><div class="task-t">为 StorageService 生成 API 文档</div><div class="task-m"><span class="badge">待审批</span><span>· 9 条</span></div></div></div>
+                  <div class="task"><div><div class="task-t">检索召回率下降排查</div><div class="task-m"><span>· 24 条</span></div></div></div>
+                  <div class="sec-label"><span>更早 · 本周</span></div>
+                  <div class="task"><div><div class="task-t">RAG 框架对比深度研究</div><div class="task-m"><span class="badge ok">完成</span><span>· 3 个产物</span></div></div></div>
+                </div>
+                <div class="pane" data-pane="tasks" hidden>
+                  <div class="sec-label"><span>任务列表 · 5</span><button class="btn sm ghost" data-toggle-batch>批量</button></div>
+                  <div class="batch-bar" style="display:none">
+                    <span class="n">已选 <b class="selCnt">0</b> 项</span><span class="sp"></span>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-archive"/></svg>归档</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-up"/></svg>导出</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-share"/></svg>分享</button>
+                    <button class="btn sm danger"><svg class="ic ic-s"><use href="#i-trash"/></svg>删除</button>
+                  </div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">读取 auth.service.ts 与 config.ts</div><div class="task-m"><span class="badge ok">完成</span><span>0.4s</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">改写 refreshToken 为单飞 + 退避</div><div class="task-m"><span class="badge ok">完成</span><span>1.8s</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">运行 auth 单测并修复引用</div><div class="task-m"><span class="badge acc">进行中</span><span>2.1s</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">生成变更说明并更新 Jira PROJ-456</div><div class="task-m"><span class="badge warn">待审批</span><span>—</span></div></div></div>
+                  <div class="task"><span class="cbx hide"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">生成架构示意图（图片）</div><div class="task-m"><span class="badge">排队</span><span>—</span></div></div></div>
+                </div>
+                <div class="pane" data-pane="art" hidden>
+                  <div class="sec-label"><span>产物 · 3</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-acc"><use href="#i-image"/></svg><span class="nm">token-refresh-flow.png</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-ppt"/></svg><span class="nm">rag-架构评审.pptx</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-video"/></svg><span class="nm">demo-intro.mp4</span></div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- 中：对话流 -->
+            <div class="center">
+              <div class="chat">
+                <div class="chat-h">
+                  <button class="model-sel"><svg class="ic ic-s"><use href="#i-layers"/></svg>deepseek:deepseek-chat <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+                  <span class="chip"><svg class="ic ic-s"><use href="#i-plugin"/></svg>42 个工具</span>
+                  <span class="chip cyan"><svg class="ic ic-s"><use href="#i-shield"/></svg>审批：手动</span>
+                  <div style="flex:1"></div>
+                  <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-history"/></svg>历史</button>
+                  <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-plus"/></svg>新会话</button>
+                </div>
+
+                <div class="chat-scroll" style="padding:18px 28px">
+                  <div class="sys-msg info"><svg class="ic ic-s t-acc"><use href="#i-info"/></svg><span>已加载工作区上下文：3 个文件 · 检索到 2 条相关长期记忆 · 模型 deepseek:deepseek-chat</span><span class="sp"></span><button class="mini"><svg class="ic ic-s"><use href="#i-x"/></svg></button></div>
+
+                  <div class="msg"><div class="msg-r">
+                    <div class="av u">我</div>
+                    <div class="msg-b">
+                      <div class="msg-who"><span class="nm">我</span><span class="tm">14:02</span><span class="msg-acts"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></span></div>
+                      <div class="bubble user"><span class="mention"><svg class="ic ic-s"><use href="#i-file"/></svg>@/src/services/auth.service.ts</span> 帮我优化这里的超时配置，参考 <span class="mention"><svg class="ic ic-s"><use href="#i-plugin"/></svg>@skill:best-practices</span>，然后把结果更新到 <span class="mention"><svg class="ic ic-s"><use href="#i-flow"/></svg>@connector:jira:PROJ-456</span></div>
+                    </div></div></div>
+
+                  <div class="msg"><div class="msg-r">
+                    <div class="av a"><svg class="ic ic-s"><use href="#i-spark"/></svg></div>
+                    <div class="msg-b">
+                      <div class="msg-who"><span class="nm">Harness</span><span class="badge acc">主 Agent</span><span class="tm">14:02</span><span class="msg-acts">
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-refresh"/></svg></button>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-share"/></svg></button>
+                        <button class="mini"><svg class="ic ic-s"><use href="#i-plus"/></svg></button></span></div>
+                      <div class="bubble">
+                        <p>已读取文件并比对技能中的超时规范，给出三处调整：</p>
+                        <ul>
+                          <li><span class="mono">refreshTimeoutMs</span>：30000 → 从 <span class="mono">config.ts</span> 读取，默认 8000</li>
+                          <li>新增退避重试（3 次，200ms 起）</li>
+                          <li>并发刷新改为单飞，避免刷新风暴</li>
+                        </ul>
+                        <div class="mem-hint"><svg class="ic ic-s"><use href="#i-brain"/></svg>基于记忆：<b>[偏好]</b> 用户偏好简洁代码风格 · <b>[习惯]</b> 常用 TypeScript <span class="t-dim" style="margin-left:4px">#m-087 #m-042</span></div>
+                      </div>
+
+                      <div class="toolcard" data-state="ok">
+                        <div class="tc-h" data-toggle-tc><span class="badge ok">已完成</span><span class="nm">read_file</span><span class="sp"></span><span class="t-dim t-sm">auth.service.ts · 0.2s</span><svg class="ic ic-s"><use href="#i-cdown"/></svg></div>
+                        <div class="tc-b" hidden><pre><span class="k">"path"</span>: <span class="s">"src/services/auth.service.ts"</span>
+<span class="k">"bytes"</span>: <span class="s">4182</span>
+<span class="k">"truncated"</span>: <span class="s">false</span></pre></div>
+                      </div>
+                      <div class="toolcard" data-state="ok">
+                        <div class="tc-h" data-toggle-tc><span class="badge ok">已完成</span><span class="nm">skill:best-practices</span><span class="sp"></span><span class="t-dim t-sm">匹配 4 条规则 · 0.6s</span><svg class="ic ic-s"><use href="#i-cdown"/></svg></div>
+                        <div class="tc-b" hidden><pre>· 网络调用必须显式超时（默认 ≤ 10s）
+· 重试必须带指数退避与抖动
+· 禁止在热路径做同步 IO
+· 敏感配置一律走 config 注入</pre></div>
+                      </div>
+
+                      <div class="codeblk">
+                        <div class="codeblk-h"><svg class="ic ic-s"><use href="#i-code"/></svg>src/services/auth.service.ts<span class="sp"></span>
+                          <span class="t-dim">TypeScript</span>
+                          <button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button>
+                          <button class="mini"><svg class="ic ic-s"><use href="#i-check"/></svg></button>
+                          <button class="mini"><svg class="ic ic-s"><use href="#i-down"/></svg></button>
+                          <button class="mini"><svg class="ic ic-s"><use href="#i-play"/></svg></button></div>
+                        <pre><span class="ln">45</span><span class="k">const</span> <span class="p">cfg</span> = <span class="k">this</span>.<span class="p">config</span>;
+<span class="ln">46</span>
+<span class="ln">47</span><span class="k">async</span> <span class="f">refreshToken</span>(<span class="p">id</span>: <span class="t">string</span>) {
+<span class="ln">48</span>  <span class="k">return</span> <span class="k">this</span>.<span class="f">singleFlight</span>.<span class="f">run</span>(id, () =&gt;
+<span class="ln">49</span>    <span class="k">this</span>.<span class="f">withRetry</span>(() =&gt; <span class="k">this</span>.<span class="f">request</span>(<span class="s">'/auth/refresh'</span>, { id }), {
+<span class="ln">50</span>      <span class="p">retries</span>: <span class="n">3</span>, <span class="p">baseDelayMs</span>: <span class="n">200</span>,
+<span class="ln">51</span>      <span class="p">timeoutMs</span>: cfg.<span class="p">refreshTimeoutMs</span> ?? <span class="n">8000</span>,
+<span class="ln">52</span>    }));
+<span class="ln">53</span>}</pre>
+                      </div>
+                    </div></div></div>
+
+                  <!-- 审批卡：视频生成（高成本） -->
+                  <div class="msg">
+                    <div class="approve" data-approve>
+                      <div class="ap-h"><svg class="ic"><use href="#i-warn"/></svg>需要审批 · 高成本多模态调用<span class="sp"></span><span class="chip danger">high</span><span class="chip">generate_video</span></div>
+                      <div class="ap-b">
+                        <div class="ap-kv"><span class="k2">Provider</span><span class="mono">openai:sora</span></div>
+                        <div class="ap-kv"><span class="k2">参数</span><span class="mono">duration=10s · 1080p · 16:9</span></div>
+                        <div class="ap-kv"><span class="k2">预估成本</span><span class="mono t-warn">≈ $0.3200</span> <span class="t-dim t-sm">（本地成本预估，非本工具收费）</span></div>
+                        <div class="ap-pre">prompt: "30 秒产品演示片头，深色科技风，Token 刷新流程图动画"</div>
+                      </div>
+                      <div class="ap-f">
+                        <button class="btn sm" data-approve-act="deny">拒绝</button>
+                        <button class="btn sm" data-approve-act="edit">编辑参数</button>
+                        <button class="btn sm" data-approve-act="always">始终允许</button>
+                        <span class="sp"></span>
+                        <button class="btn sm primary" data-approve-act="once">允许一次</button>
+                      </div>
+                      <div class="ap-done"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="ap-done-t">已允许（仅本次）</span></div>
+                    </div>
+                  </div>
+
+                  <!-- 审批卡：文件删除（费用未知） -->
+                  <div class="msg">
+                    <div class="approve critical" data-approve>
+                      <div class="ap-h"><svg class="ic"><use href="#i-warn"/></svg>需要审批 · 不可逆操作<span class="sp"></span><span class="chip danger">critical</span><span class="chip">file_tools.delete</span></div>
+                      <div class="ap-b">
+                        <div class="ap-kv"><span class="k2">目标</span><span class="mono">./dist/legacy-cache/** （128 个文件 · 46.2 MB）</span></div>
+                        <div class="ap-kv"><span class="k2">预估成本</span><span class="mono t-dim">费用未知 <span class="t-dim">· 本地操作无 API 单价</span></span></div>
+                        <div class="ap-pre">rm -rf ./dist/legacy-cache</div>
+                      </div>
+                      <div class="ap-f">
+                        <button class="btn sm" data-approve-act="deny">拒绝</button>
+                        <button class="btn sm" data-approve-act="edit">编辑参数</button>
+                        <button class="btn sm" data-approve-act="always">始终允许</button>
+                        <span class="sp"></span>
+                        <button class="btn sm primary" data-approve-act="once">允许一次</button>
+                      </div>
+                      <div class="ap-done"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="ap-done-t">已允许（仅本次）</span></div>
+                    </div>
+                  </div>
+
+                  <!-- 产物卡片 -->
+                  <div class="msg"><div class="msg-r">
+                    <div class="av a"><svg class="ic ic-s"><use href="#i-spark"/></svg></div>
+                    <div class="msg-b">
+                      <div class="msg-who"><span class="nm">Harness</span><span class="badge acc">主 Agent</span><span class="tm">14:04</span></div>
+                      <div class="bubble"><p>已生成架构示意图，可下载 / 复制 / 插入编辑器 / 分享：</p>
+                        <div class="artifact">
+                          <div class="thumb img">PNG</div>
+                          <div class="ar-b">
+                            <div class="ar-t">token-refresh-flow.png</div>
+                            <div class="ar-m">1024×1024 · 1.2 MB · generate_image · 费用未知</div>
+                          </div>
+                          <div class="ar-a">
+                            <button class="mini"><svg class="ic ic-s"><use href="#i-down"/></svg></button>
+                            <button class="mini"><svg class="ic ic-s"><use href="#i-copy"/></svg></button>
+                            <button class="mini"><svg class="ic ic-s"><use href="#i-code"/></svg></button>
+                            <button class="mini"><svg class="ic ic-s"><use href="#i-share"/></svg></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div></div></div>
+
+                  <!-- 流式 -->
+                  <div class="msg"><div class="msg-r">
+                    <div class="av a"><svg class="ic ic-s"><use href="#i-spark"/></svg></div>
+                    <div class="msg-b">
+                      <div class="msg-who"><span class="nm">Harness</span><span class="badge acc">主 Agent</span><span class="tm">正在生成</span><span class="msg-acts"><button class="btn sm"><svg class="ic ic-s"><use href="#i-stop"/></svg>停止生成</button></span></div>
+                      <div class="bubble">
+                        <p>接下来把变更同步到 Jira PROJ-456，并附上单测覆盖率报告<span class="typing"></span></p>
+                      </div>
+                      <div class="detail-log"><div class="toolcard" data-state="running">
+                        <div class="tc-h"><span class="badge acc">运行中</span><span class="nm">connector:jira.updateIssue</span><span class="sp"></span><span class="t-dim t-sm">POST /issue/PROJ-456</span></div></div></div>
+                    </div></div></div>
+                </div>
+
+                <!-- 输入区 + @提及 -->
+                <div class="composer">
+                  <div class="mention-pop on" id="mentionPop">
+                    <div class="mp-hint"><svg class="ic ic-s"><use href="#i-at"/></svg><span>输入 <b class="mono">@auth</b> · 模糊匹配 4 类对象（↑↓ 选择，Enter 补全，Esc 关闭）</span></div>
+                    <div class="mp-h"><svg class="ic ic-s"><use href="#i-file"/></svg>文件</div>
+                    <div class="mp-i file on"><span class="ico"><svg class="ic ic-s"><use href="#i-file"/></svg></span><div><div class="nm">auth.service.ts</div><div class="ds">src/services · 4.1 KB</div></div><span class="ref">@/src/services/auth.service.ts</span></div>
+                    <div class="mp-i file"><span class="ico"><svg class="ic ic-s"><use href="#i-file"/></svg></span><div><div class="nm">auth.spec.ts</div><div class="ds">tests · 2.2 KB</div></div><span class="ref">@/tests/auth.spec.ts</span></div>
+                    <div class="mp-h"><svg class="ic ic-s"><use href="#i-plugin"/></svg>技能</div>
+                    <div class="mp-i skill"><span class="ico"><svg class="ic ic-s"><use href="#i-plugin"/></svg></span><div><div class="nm">auth-helper</div><div class="ds">鉴权改造最佳实践</div></div><span class="ref">@skill:auth-helper</span></div>
+                    <div class="mp-h"><svg class="ic ic-s"><use href="#i-flow"/></svg>连接器</div>
+                    <div class="mp-i conn"><span class="ico"><svg class="ic ic-s"><use href="#i-flow"/></svg></span><div><div class="nm">Jira · PROJ-456</div><div class="ds">Token 刷新重构</div></div><span class="ref">@connector:jira:PROJ-456</span></div>
+                    <div class="mp-h"><svg class="ic ic-s"><use href="#i-brain"/></svg>记忆</div>
+                    <div class="mp-i mem"><span class="ico"><svg class="ic ic-s"><use href="#i-brain"/></svg></span><div><div class="nm">用户偏好简洁代码风格</div><div class="ds">preference · 置信度 0.92</div></div><span class="ref">@memory:m-087</span></div>
+                  </div>
+
+                  <div class="ctx-bar">
+                    <span class="chip"><svg class="ic ic-s"><use href="#i-file"/></svg>auth.service.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                    <span class="chip"><svg class="ic ic-s"><use href="#i-file"/></svg>config.ts<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                    <span class="chip"><svg class="ic ic-s"><use href="#i-plugin"/></svg>best-practices<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                    <span class="chip purple"><svg class="ic ic-s"><use href="#i-brain"/></svg>2 条记忆<button class="x"><svg class="ic ic-s"><use href="#i-x"/></svg></button></span>
+                    <button class="btn sm ghost">清空全部</button>
+                  </div>
+                  <div class="ta-wrap">
+                    <textarea rows="3" placeholder="输入消息…（输入 @ 可提及文件 / 技能 / 连接器 / 记忆）">@auth</textarea>
+                    <div class="ta-bar">
+                      <button class="icon-btn"><svg class="ic"><use href="#i-clip"/></svg></button>
+                      <button class="icon-btn"><svg class="ic"><use href="#i-code"/></svg></button>
+                      <button class="icon-btn"><svg class="ic"><use href="#i-layers"/></svg></button>
+                      <button class="icon-btn"><svg class="ic"><use href="#i-at"/></svg></button>
+                      <span class="sp"></span>
+                      <button class="model-sel"><svg class="ic ic-s"><use href="#i-layers"/></svg>deepseek:deepseek-chat <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+                      <button class="chip">CodeGen <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+                      <button class="send"><svg class="ic ic-s"><use href="#i-send"/></svg></button>
+                    </div>
+                  </div>
+                  <div class="hint-line"><span><kbd>Enter</kbd> 发送</span><span><kbd>Shift+Enter</kbd> 换行</span><span><kbd>@</kbd> 提及</span><span><kbd>Ctrl+/</kbd> Markdown 预览</span><span><kbd>Esc</kbd> 取消生成</span><span class="sp"></span><span class="mono">1,284 / 128,000 tokens</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右：Agent 任务 / 工具输出 / 上下文 -->
+            <aside class="side-r">
+              <div class="seg-tabs" style="border-bottom:1px solid var(--line)">
+                <button class="seg-tab on" data-pane="at">Agent 任务</button>
+                <button class="seg-tab" data-pane="to">工具输出</button>
+                <button class="seg-tab" data-pane="cv">上下文</button>
+              </div>
+              <div class="side-scroll" data-seg="chatR">
+                <div class="pane" data-pane="at">
+                  <div class="sec-label"><span>执行计划 · 5 步</span><span class="cnt">2.1s</span></div>
+                  <div class="task"><span class="cbx on" style="visibility:visible;background:var(--ok);border-color:var(--ok)"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">读取 auth.service.ts / config.ts</div><div class="task-m"><span class="t-ok">完成</span><span>0.2s</span></div></div></div>
+                  <div class="task"><span class="cbx on" style="visibility:visible;background:var(--ok);border-color:var(--ok)"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">匹配 best-practices 技能规则</div><div class="task-m"><span class="t-ok">完成</span><span>0.6s</span></div></div></div>
+                  <div class="task"><span class="cbx on" style="visibility:visible;background:var(--ok);border-color:var(--ok)"><svg class="ic ic-s"><use href="#i-check"/></svg></span><div><div class="task-t">改写 refreshToken（+6 / −1）</div><div class="task-m"><span class="t-ok">完成</span><span>1.8s</span></div></div></div>
+                  <div class="task on"><span class="cbx" style="visibility:visible;border-color:var(--accent)"></span><div><div class="task-t">运行 auth 单测</div><div class="task-m"><span class="t-acc">进行中</span><span>2.1s</span></div></div></div>
+                  <div class="task"><span class="cbx hide"></span><div><div class="task-t">更新 Jira PROJ-456</div><div class="task-m"><span class="t-warn">待审批</span><span>—</span></div></div></div>
+                  <div class="sec-label"><span>子 Agent</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-acc"><use href="#i-spark"/></svg><span class="nm">CodeGen</span><span class="mut">active</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-dim"><use href="#i-spark"/></svg><span class="nm">ReviewBot</span><span class="mut" style="color:var(--text-4)">idle</span></div>
+                </div>
+                <div class="pane" data-pane="to" hidden>
+                  <div class="sec-label"><span>调用记录 · 6</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="nm">read_file</span><span class="mut">0.2s</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="nm">skill:best-practices</span><span class="mut">0.6s</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="nm">edit_file</span><span class="mut">1.8s</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-acc"><use href="#i-clock"/></svg><span class="nm">execute_code(vitest)</span><span class="mut">2.1s</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-red"><use href="#i-warn"/></svg><span class="nm">file_tools.delete</span><span class="mut" style="color:var(--danger)">待审批</span></div>
+                </div>
+                <div class="pane" data-pane="cv" hidden>
+                  <div class="sec-label"><span>上下文窗口</span><span class="cnt">1,284 / 128,000</span></div>
+                  <div class="progress" style="margin-bottom:10px"><i style="width:1%"></i></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">auth.service.ts</span><span class="mut">1,820 t</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">config.ts</span><span class="mut">640 t</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-pur"><use href="#i-brain"/></svg><span class="nm">长期记忆 · 2 条</span><span class="mut">96 t</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-history"/></svg><span class="nm">历史摘要 · 前 6 轮</span><span class="mut">1,104 t</span></div>
+                  <div class="sec-label"><span>压缩</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-layers"/></svg><span class="nm">LLMLingua 侧车</span><span class="mut" style="color:var(--warn)">未启用</span></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="statusbar">
+            <span><svg class="ic ic-s" style="vertical-align:-2px"><use href="#i-spark"/></svg> <b>Harness</b> 正在生成</span>
+            <span>deepseek:deepseek-chat</span><span>1,284 tokens</span>
+            <span class="sp"></span>
+            <span><b>插件</b> 18</span><span><b>审批</b> 手动</span><span>本地加密存储</span>
+          </div>
+
+          <div class="anno" style="top:150px;left:280px"><div class="anno-dot">1</div><div class="anno-pop"><b>@提及下拉</b>：输入 <span class="mono">@</span> 后分类列出文件 / 技能 / 连接器 / 记忆，选中补全为 <span class="mono">@ref</span> 并高亮，Agent 自动注入上下文。<span class="src">§14.2.1 MentionItem</span></div></div>
+          <div class="anno" style="bottom:150px;left:600px"><div class="anno-dot">2</div><div class="anno-pop"><b>审批卡</b>：高风险 / 高成本操作强制手动确认，含完整参数预览与 <span class="mono">estimatedCost</span>；无法估算时显示「费用未知」占位符。<span class="src">§10.2 ApprovalRequest · §12.3.1</span></div></div>
+          <div class="anno" style="bottom:196px;right:60px"><div class="anno-dot">3</div><div class="anno-pop"><b>右侧面板</b>：Agent 任务 / 工具输出 / 上下文查看器三视图，与 14.1 rightSidebar 一致。<span class="src">§14.1 rightSidebar.sections</span></div></div>
+          <div class="anno" style="top:230px;right:330px"><div class="anno-dot">4</div><div class="anno-pop"><b>memoryHint</b>：唯一数据来源为 5.3.4 <span class="mono">MemoryRetriever.buildMemoryContext()</span> 返回的 <span class="mono">references</span>，点击可跳转记忆条目。<span class="src">§5.3.4 / §14.2 memoryHint</span></div></div>
+        </div>
+        </section>
+        <!-- ========== 03 深度研究 ========== -->
+        <section class="frame" data-screen="research">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 深度研究 · RAG 框架工程化对比</div>
+            <div class="tbar-r"><span class="badge acc">Pro 层级 · 免费</span></div>
+          </div>
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <button class="ws-sel"><svg class="ic ic-s"><use href="#i-spark"/></svg>DeepResearch <svg class="ic ic-s"><use href="#i-cdown"/></svg></button>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip busy"><span class="dot pulse"></span>检索中 · 62%</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-set"/></svg></button>
+            <div class="avatar">U</div>
+          </header>
+
+          <div class="main">
+            <aside class="side-l">
+              <div class="side-top">
+                <label class="search"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索研究任务…"></label>
+                <button class="icon-btn"><svg class="ic"><use href="#i-plus"/></svg></button>
+              </div>
+              <div class="seg-tabs" data-seg="rsL">
+                <button class="seg-tab on" data-pane="run">进行中</button>
+                <button class="seg-tab" data-pane="done">已完成</button>
+              </div>
+              <div class="side-scroll">
+                <div class="pane" data-pane="run">
+                  <div class="task on"><div><div class="task-t">2026 年主流 RAG 框架工程化落地差异</div><div class="task-m"><span class="badge acc">62%</span><span>检索中</span><span>· 18 源</span></div></div></div>
+                  <div class="task"><div><div class="task-t">向量数据库选型：Milvus vs pgvector vs Qdrant</div><div class="task-m"><span class="badge warn">待审校</span><span>· 12 源</span></div></div></div>
+                </div>
+                <div class="pane" data-pane="done" hidden>
+                  <div class="task"><div><div class="task-t">kb-rag 召回率下降根因分析</div><div class="task-m"><span class="badge ok">完成</span><span>3 天前</span></div></div></div>
+                  <div class="task"><div><div class="task-t">大模型压缩方案对比（LLMLingua / LongLLMLingua）</div><div class="task-m"><span class="badge ok">完成</span><span>上周</span></div></div></div>
+                </div>
+              </div>
+            </aside>
+
+            <div class="center">
+              <div class="rs-main">
+                <div class="rs-scroll">
+                  <div class="q-card">
+                    <div class="q-t">2026 年主流 RAG 框架在工程化落地上的关键差异是什么？</div>
+                    <div class="q-meta">
+                      <span class="chip purple"><svg class="ic ic-s"><use href="#i-tag"/></svg>范围：中文企业场景</span>
+                      <span class="chip">深度：标准（4–6 源交叉验证）</span>
+                      <span class="chip">预算：≈ $0.4200</span>
+                      <span class="chip cyan"><svg class="ic ic-s"><use href="#i-layers"/></svg>路由：检索用 qwen-long / 推理用 deepseek-chat</span>
+                    </div>
+                  </div>
+
+                  <div class="steps" id="rsSteps">
+                    <div class="step done"><span class="cir"><svg class="ic ic-s"><use href="#i-check"/></svg></span><span class="lb">理解需求</span></div>
+                    <div class="step done"><span class="cir"><svg class="ic ic-s"><use href="#i-check"/></svg></span><span class="lb">规划检索</span></div>
+                    <div class="step run"><span class="cir">3</span><span class="lb">并行检索</span></div>
+                    <div class="step"><span class="cir">4</span><span class="lb">交叉验证</span></div>
+                    <div class="step"><span class="cir">5</span><span class="lb">综合分析</span></div>
+                    <div class="step"><span class="cir">6</span><span class="lb">生成报告</span></div>
+                  </div>
+                  <div class="progress"><i id="rsBar" style="width:62%"></i></div>
+
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <h3 style="font-size:13px;font-weight:650">检索源 · 18</h3>
+                    <span class="sp" style="flex:1"></span>
+                    <button class="btn sm" id="rsRun"><svg class="ic ic-s"><use href="#i-play"/></svg>继续研究</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-stop"/></svg>暂停</button>
+                  </div>
+                  <div class="panel" style="margin-bottom:16px">
+                    <div class="src-row"><svg class="ic ic-s t-acc"><use href="#i-globe"/></svg><span style="flex:1">Web 检索（5 个查询并行）</span><span class="badge ok">14 命中</span><span class="t-dim t-sm">已完成</span></div>
+                    <div class="src-row"><svg class="ic ic-s t-pur"><use href="#i-file"/></svg><span style="flex:1">学术源（arXiv / CNKI）</span><span class="badge">6 命中</span><span class="t-acc t-sm">检索中</span></div>
+                    <div class="src-row"><svg class="ic ic-s t-ok"><use href="#i-db"/></svg><span style="flex:1">本地知识库（kb-rag · 128 文档）</span><span class="badge ok">9 命中</span><span class="t-dim t-sm">已完成</span></div>
+                    <div class="src-row"><svg class="ic ic-s t-warn"><use href="#i-flow"/></svg><span style="flex:1">连接器（Notion 团队空间 / GitHub）</span><span class="badge warn">需授权</span><span class="t-dim t-sm">已跳过</span></div>
+                  </div>
+
+                  <h3 style="font-size:13px;font-weight:650;margin-bottom:8px">阶段性发现 · 3</h3>
+                  <div class="find-card">
+                    <div class="t">工程化差异集中在「检索编排」而非「向量库本身」</div>
+                    <div class="d">在 12 个中文企业案例中，召回质量的主要瓶颈来自切片策略与重排（rerank）缺失，而非向量库选型差异。<span class="cite">[1]</span><span class="cite">[4]</span><span class="cite">[7]</span></div>
+                  </div>
+                  <div class="find-card">
+                    <div class="t">混合检索（BM25 + 向量）在中短文档上收益最稳定</div>
+                    <div class="d">纯向量检索在术语密集型语料上召回率平均低 11.3 个百分点；开启混合检索后差距缩小至 2.1。<span class="cite">[2]</span><span class="cite">[9]</span></div>
+                  </div>
+                  <div class="find-card">
+                    <div class="t">上下文压缩的成本收益拐点在 32K 左右</div>
+                    <div class="d">超过 32K tokens 后，压缩带来的延迟下降不足以抵消语义损失；建议按任务类型动态开关。<span class="cite">[5]</span><span class="cite">[11]</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="side-r">
+              <div class="panel-h"><svg class="ic ic-s"><use href="#i-file"/></svg>引用与来源<span class="sp"></span><span class="badge">18</span></div>
+              <div class="side-scroll">
+                <div class="sec-label"><span>已验证引用 · 12</span></div>
+                <div class="find-card" style="margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="cite">[1]</span><span class="t-sm" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">rag-benchmark-cn-2026</span><span class="chip ok">可信 0.93</span></div>
+                  <div class="t-dim t-sm" style="font:10px var(--mono)">docs.example.cn · 访问 2026-08-29 09:12</div>
+                </div>
+                <div class="find-card" style="margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="cite">[2]</span><span class="t-sm" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Hybrid Retrieval 综述</span><span class="chip ok">可信 0.90</span></div>
+                  <div class="t-dim t-sm" style="font:10px var(--mono)">arxiv.org/abs/2601.xx · 访问 09:13</div>
+                </div>
+                <div class="find-card" style="margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="cite">[4]</span><span class="t-sm" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">企业 RAG 落地白皮书</span><span class="chip warn">可信 0.71</span></div>
+                  <div class="t-dim t-sm" style="font:10px var(--mono)">vendor.report.cn · 访问 09:14</div>
+                </div>
+                <div class="sec-label"><span>报告产物</span></div>
+                <div class="tree-row"><svg class="ic ic-s"><use href="#i-file"/></svg><span class="nm">RAG-框架对比报告.md</span></div>
+                <div class="tree-row"><svg class="ic ic-s"><use href="#i-image"/></svg><span class="nm">fig-召回率对比.png</span></div>
+                <div style="display:flex;gap:6px;margin-top:10px">
+                  <button class="btn sm" style="flex:1"><svg class="ic ic-s"><use href="#i-down"/></svg>导出 PDF</button>
+                  <button class="btn sm" style="flex:1"><svg class="ic ic-s"><use href="#i-down"/></svg>导出 Word</button>
+                </div>
+                <button class="btn sm primary block" style="margin-top:6px"><svg class="ic ic-s"><use href="#i-ppt"/></svg>生成 PPT 报告</button>
+              </div>
+            </aside>
+          </div>
+
+          <div class="statusbar">
+            <span><svg class="ic ic-s" style="vertical-align:-2px"><use href="#i-spark"/></svg> <b>DeepResearch</b> 并行检索中</span>
+            <span>18 源 · 12 引用</span><span>已用 2m 14s</span>
+            <span class="sp"></span>
+            <span>预估成本 ≈ $0.4200</span><span>Esc 取消</span>
+          </div>
+
+          <div class="anno" style="top:150px;left:420px"><div class="anno-dot">1</div><div class="anno-pop"><b>阶段进度</b>：理解需求 → 规划检索 → 并行检索 → 交叉验证 → 综合分析 → 生成报告，实时回传每一步状态。<span class="src">§7.1 / §7.2</span></div></div>
+          <div class="anno" style="top:330px;right:340px"><div class="anno-pop"><b>内嵌引用</b>：每个结论附来源 URL、访问时间与可信度评分，可点击溯源。<span class="src">§7.2 进度与引用</span></div><div class="anno-dot">2</div></div>
+          <div class="anno" style="bottom:40px;right:330px"><div class="anno-dot">3</div><div class="anno-pop"><b>与 PPT 打通</b>：研究完成后复用结构化大纲一键生成演示文稿，避免重复生成。<span class="src">§4.3.3 / §7.2</span></div></div>
+        </div>
+        </section>
+
+        <!-- ========== 04 模型 Provider ========== -->
+        <section class="frame" data-screen="models">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 设置</div>
+            <div class="tbar-r"><span class="chip ok"><svg class="ic ic-s"><use href="#i-lock"/></svg>凭据存于系统 Keychain</span></div>
+          </div>
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip"><span class="dot"></span>全部服务正常</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-x"/></svg></button>
+          </header>
+
+          <div class="set-grid">
+            <nav class="set-nav">
+              <button class="set-nav-i" data-go="settings" data-tab="general"><svg class="ic ic-s"><use href="#i-set"/></svg>通用</button>
+              <button class="set-nav-i on" data-go="models"><svg class="ic ic-s"><use href="#i-layers"/></svg>模型 Provider</button>
+              <button class="set-nav-i" data-go="memory"><svg class="ic ic-s"><use href="#i-brain"/></svg>长期记忆</button>
+              <button class="set-nav-i" data-go="settings" data-tab="perm"><svg class="ic ic-s"><use href="#i-shield"/></svg>权限与审批</button>
+              <button class="set-nav-i" data-go="settings" data-tab="keymap"><svg class="ic ic-s"><use href="#i-key"/></svg>快捷键</button>
+              <button class="set-nav-i" data-go="settings" data-tab="usage"><svg class="ic ic-s"><use href="#i-spark"/></svg>用量仪表盘</button>
+              <button class="set-nav-i" data-go="settings" data-tab="about"><svg class="ic ic-s"><use href="#i-info"/></svg>关于</button>
+              <div style="height:10px"></div>
+              <button class="set-nav-i" data-go="plugins"><svg class="ic ic-s"><use href="#i-plugin"/></svg>插件市场</button>
+            </nav>
+
+            <div class="set-main">
+              <div class="set-h">
+                <div>
+                  <div class="t">模型 Provider</div>
+                  <div class="d">统一 Model Provider 体系：原生支持 DeepSeek / OpenAI / 智谱 / 阿里 / 百度 / 腾讯 / Anthropic / Moonshot，并可通过 openai-compat 接入任意自建端点。API Key 由用户自备，加密存入系统 Keychain，不落明文。</div>
+                </div>
+                <span class="sp"></span>
+                <button class="btn primary" data-open="modalAddModel"><svg class="ic ic-s"><use href="#i-plus"/></svg>添加自定义模型</button>
+              </div>
+
+              <div class="panel" style="margin-bottom:16px">
+                <div class="panel-h"><svg class="ic ic-s"><use href="#i-layers"/></svg>已配置 Provider · 6<span class="sp"></span><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-refresh"/></svg>全部测试</button></div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--accent-2);border-color:var(--accent-line)">DS</div>
+                  <div class="prov-b">
+                    <div class="prov-n">DeepSeek<span class="badge acc">默认</span><span class="chip ok"><span class="st-dot ok"></span>已连通</span></div>
+                    <div class="prov-m"><span>baseURL api.deepseek.com/v1</span><span>3 个模型</span><span>延迟 328ms</span><span>Key 2 把 · 轮询</span></div>
+                  </div>
+                  <div class="prov-a">
+                    <button class="btn sm ghost">编辑</button>
+                    <button class="btn sm ghost" data-test>测试</button>
+                    <button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button>
+                  </div>
+                </div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--ok)">GLM</div>
+                  <div class="prov-b">
+                    <div class="prov-n">智谱 GLM<span class="chip ok"><span class="st-dot ok"></span>已连通</span></div>
+                    <div class="prov-m"><span>openai-compat · open.bigmodel.cn</span><span>4 个模型</span><span>延迟 512ms</span><span>Key 1 把</span></div>
+                  </div>
+                  <div class="prov-a"><button class="btn sm ghost">编辑</button><button class="btn sm ghost" data-test>测试</button><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button></div>
+                </div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--warn)">QW</div>
+                  <div class="prov-b">
+                    <div class="prov-n">阿里通义千问<span class="chip ok"><span class="st-dot ok"></span>已连通</span></div>
+                    <div class="prov-m"><span>DashScope 兼容端点</span><span>6 个模型</span><span>延迟 445ms</span><span>长文档路由</span></div>
+                  </div>
+                  <div class="prov-a"><button class="btn sm ghost">编辑</button><button class="btn sm ghost" data-test>测试</button><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button></div>
+                </div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--cyan)">OAI</div>
+                  <div class="prov-b">
+                    <div class="prov-n">OpenAI<span class="chip warn"><span class="st-dot warn"></span>Key 即将限流</span></div>
+                    <div class="prov-m"><span>api.openai.com/v1</span><span>5 个模型</span><span>延迟 802ms</span><span>剩余配额 12%</span></div>
+                  </div>
+                  <div class="prov-a"><button class="btn sm ghost">编辑</button><button class="btn sm ghost" data-test>测试</button><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button></div>
+                </div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--purple)">LOC</div>
+                  <div class="prov-b">
+                    <div class="prov-n">local-llm（自建网关）<span class="chip"><span class="st-dot off"></span>未测试</span></div>
+                    <div class="prov-m"><span>openai-compat · http://localhost:8000/v1</span><span>1 个模型</span><span>无单价 → 费用未知</span></div>
+                  </div>
+                  <div class="prov-a"><button class="btn sm ghost">编辑</button><button class="btn sm ghost" data-test>测试</button><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button></div>
+                </div>
+                <div class="prov">
+                  <div class="prov-ico" style="color:var(--danger)">BD</div>
+                  <div class="prov-b">
+                    <div class="prov-n">百度文心<span class="chip danger"><span class="st-dot bad"></span>连接失败</span></div>
+                    <div class="prov-m"><span>401 Key 无效</span><span>建议：重新录入 Key 或检查代理</span></div>
+                  </div>
+                  <div class="prov-a"><button class="btn sm ghost">编辑</button><button class="btn sm ghost" data-test>测试</button><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-more"/></svg></button></div>
+                </div>
+              </div>
+
+              <!-- 连通性测试 -->
+              <div class="panel" style="margin-bottom:16px">
+                <div class="panel-h"><svg class="ic ic-s"><use href="#i-globe"/></svg>连通性测试与健康检查<span class="sp"></span><span class="t-dim t-sm">§2.8.4</span></div>
+                <div class="panel-b">
+                  <div class="row">
+                    <select class="select"><option>DeepSeek · deepseek-chat</option><option>智谱 GLM · glm-4-plus</option><option>local-llm · qwen2.5</option></select>
+                    <button class="btn" style="flex:0 0 auto" data-test><svg class="ic ic-s"><use href="#i-play"/></svg>Test Connection</button>
+                    <button class="btn" style="flex:0 0 auto" data-test><svg class="ic ic-s"><use href="#i-play"/></svg>Test Chat</button>
+                  </div>
+                  <div class="test-out" id="testOut">
+                    <div class="h"><span class="badge ok">200 OK</span><span>耗时 328ms</span><span class="sp" style="flex:1"></span><span class="t-dim">GET /v1/models</span></div>
+                    <div class="b">availableModels: [ "deepseek-chat", "deepseek-reasoner", "deepseek-coder" ]
+stream:        ✓ SSE 正常（首 token 142ms）
+tool_calls:    ✓ function_call 格式一致
+suggestion:    Key 有效，剩余配额 88%。建议开启多 Key 轮询以应对限流。</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Key 池 -->
+              <div class="panel">
+                <div class="panel-h"><svg class="ic ic-s"><use href="#i-key"/></svg>多 Key 与负载均衡 · DeepSeek<span class="sp"></span>
+                  <select class="select" style="width:150px;height:24px"><option>round-robin 轮询</option><option>random 随机</option><option>least-used 最小剩余</option></select>
+                </div>
+                <div class="keypool-row"><span class="st-dot ok"></span><span>sk-7f3a…9c21</span><span style="flex:1"></span><span class="t-dim">配额 88%</span><span class="t-dim">1 分钟前</span><span class="badge ok">启用</span></div>
+                <div class="keypool-row"><span class="st-dot ok"></span><span>sk-2b91…41de</span><span style="flex:1"></span><span class="t-dim">配额 64%</span><span class="t-dim">3 分钟前</span><span class="badge ok">启用</span></div>
+                <div class="keypool-row" style="opacity:.6"><span class="st-dot bad"></span><span>sk-c0a5…77fe</span><span style="flex:1"></span><span class="t-red">429 限流已自动剔除</span><span class="t-dim">10 分钟前</span><span class="badge">禁用</span></div>
+                <div class="panel-b t-dim t-sm" style="border-top:1px solid var(--line)">
+                  单 Key 触发 <span class="mono">429</span> / <span class="mono">401</span> 时自动剔除并切换下一把 Key，无需中断对话。凭据仅存系统 Keychain，导出默认脱敏。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 添加自定义模型弹窗 -->
+          <div class="mask" data-modal="modalAddModel">
+            <div class="modal">
+              <div class="modal-h"><svg class="ic"><use href="#i-layers"/></svg>
+                <div class="modal-t">添加自定义模型<small>§2.8.1 CustomModelInput · 支持 GUI / CLI / 配置文件三种方式</small></div>
+                <span style="flex:1"></span><button class="icon-btn" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+              </div>
+              <div class="modal-b">
+                <div class="row">
+                  <div class="field"><label class="field-l">标识 ID <span class="req">*</span></label><input class="input mono" value="my-glm"></div>
+                  <div class="field"><label class="field-l">Provider <span class="req">*</span></label>
+                    <select class="select"><option>openai-compat</option><option selected>zhipu</option><option>aliyun</option><option>baidu</option><option>tencent</option><option>deepseek</option><option>openai</option><option>anthropic</option><option>moonshot</option></select>
+                  </div>
+                </div>
+                <div class="field"><label class="field-l">自定义端点 baseURL</label><input class="input mono" placeholder="https://open.bigmodel.cn/api/paas/v4"><div class="field-hint">留空则使用厂商默认端点；自建网关需实现 /v1/chat/completions + /v1/models</div></div>
+                <div class="field"><label class="field-l">API Key <span class="req">*</span></label><input class="input mono" type="password" value="sk-••••••••••••••••3f21"><div class="field-hint">加密写入系统 Keychain（Windows 凭据管理器 / macOS Keychain / libsecret），不落明文配置文件</div></div>
+                <div class="field"><label class="field-l">模型列表（每行一个）</label><textarea class="textarea mono" rows="3">glm-4-plus
+glm-4-air
+glm-4v</textarea></div>
+                <div class="field"><label class="field-l">价格配置（每百万 token · USD，可选）</label>
+                  <div class="row">
+                    <div class="field" style="margin:0"><label class="field-l">输入 $/1M</label><input class="input mono" type="number" step="0.0001" min="0" placeholder="0.27" value="0.27"></div>
+                    <div class="field" style="margin:0"><label class="field-l">输出 $/1M</label><input class="input mono" type="number" step="0.0001" min="0" placeholder="1.10" value="1.10"></div>
+                  </div>
+                  <div class="field-hint">用于本地用量仪表盘的成本预估（见 §12.3.1 CostEstimationService）；留空则该模型显示「费用未知」。单价可随时在「模型 Provider → 添加自定义模型」或本页按模型覆盖。</div>
+                </div>
+                <div class="row">
+                  <div class="field"><label class="field-l">代理（可选）</label><input class="input mono" placeholder="http://127.0.0.1:7890"></div>
+                  <div class="field"><label class="field-l">额外请求头（可选）</label><input class="input mono" placeholder="X-Gateway-Token=…"></div>
+                </div>
+              </div>
+              <div class="modal-f">
+                <button class="btn ghost" data-test><svg class="ic ic-s"><use href="#i-play"/></svg>测试连接</button>
+                <span class="sp"></span>
+                <button class="btn" data-close>取消</button>
+                <button class="btn primary" data-close>保存并启用</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="anno" style="top:120px;left:210px"><div class="anno-dot">1</div><div class="anno-pop"><b>设置导航</b>：通用 / 模型 / 记忆 / 权限与审批 / 快捷键 / 用量 / 关于；点击可跨屏切换。<span class="src">§14.3 / §2.7 / §5.3 / §10 / §12</span></div></div>
+          <div class="anno" style="top:210px;right:60px"><div class="anno-dot">2</div><div class="anno-pop"><b>连通性测试</b>：添加后立即探测，返回耗时、模型列表、错误码与修复建议（401→Key 无效，403→无权限）。<span class="src">§2.8.4 ConnectionTestResult</span></div></div>
+          <div class="anno" style="bottom:60px;right:60px"><div class="anno-dot">3</div><div class="anno-pop"><b>凭据隔离</b>：系统 Keychain 优先，环境变量兜底；导出默认脱敏，支持一键清除全部凭据。<span class="src">§2.8.3</span></div></div>
+        </div>
+        </section>
+
+        <!-- ========== 05 长期记忆 ========== -->
+        <section class="frame" data-screen="memory">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 设置 · 长期记忆</div>
+            <div class="tbar-r"><span class="chip purple"><svg class="ic ic-s"><use href="#i-lock"/></svg>本地加密 SQLCipher</span></div>
+          </div>
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip"><span class="dot"></span>自动提取已开启</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-x"/></svg></button>
+          </header>
+
+          <div class="set-grid">
+            <nav class="set-nav">
+              <button class="set-nav-i" data-go="settings" data-tab="general"><svg class="ic ic-s"><use href="#i-set"/></svg>通用</button>
+              <button class="set-nav-i" data-go="models"><svg class="ic ic-s"><use href="#i-layers"/></svg>模型 Provider</button>
+              <button class="set-nav-i on" data-go="memory"><svg class="ic ic-s"><use href="#i-brain"/></svg>长期记忆</button>
+              <button class="set-nav-i" data-go="settings" data-tab="perm"><svg class="ic ic-s"><use href="#i-shield"/></svg>权限与审批</button>
+              <button class="set-nav-i" data-go="settings" data-tab="keymap"><svg class="ic ic-s"><use href="#i-key"/></svg>快捷键</button>
+              <button class="set-nav-i" data-go="settings" data-tab="usage"><svg class="ic ic-s"><use href="#i-spark"/></svg>用量仪表盘</button>
+              <button class="set-nav-i" data-go="settings" data-tab="about"><svg class="ic ic-s"><use href="#i-info"/></svg>关于</button>
+              <div style="height:10px"></div>
+              <button class="set-nav-i" data-go="plugins"><svg class="ic ic-s"><use href="#i-plugin"/></svg>插件市场</button>
+            </nav>
+
+            <div class="set-main">
+              <div class="set-h">
+                <div>
+                  <div class="t">长期记忆 · 个人画像</div>
+                  <div class="d">结构化、可查看、可编辑、可遗忘的用户画像。仅存本地加密数据库，永不自动上传；云同步时端到端加密。敏感信息（密码 / Token）默认不自动提取。</div>
+                </div>
+                <span class="sp"></span>
+                <button class="btn" style="flex:none"><svg class="ic ic-s"><use href="#i-up"/></svg>导入</button>
+                <button class="btn" style="flex:none"><svg class="ic ic-s"><use href="#i-down"/></svg>导出</button>
+                <button class="btn primary" data-open="modalAddMem" style="flex:none"><svg class="ic ic-s"><use href="#i-plus"/></svg>添加记忆</button>
+              </div>
+
+              <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+                <label class="search" style="max-width:280px"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索记忆内容 / 标签…"></label>
+                <span style="flex:1"></span>
+                <button class="chip on" data-mfilter="all">全部 128</button>
+                <button class="chip" data-mfilter="fact">事实 42</button>
+                <button class="chip" data-mfilter="preference">偏好 31</button>
+                <button class="chip" data-mfilter="habit">习惯 24</button>
+                <button class="chip" data-mfilter="conclusion">结论 19</button>
+                <button class="chip" data-mfilter="summary">摘要 12</button>
+                <button class="chip"><svg class="ic ic-s"><use href="#i-filter"/></svg>时间</button>
+              </div>
+
+              <div class="mem-grid" id="memGrid">
+                <div class="mem-card" data-type="preference">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip purple">偏好</span><span class="badge">#m-087</span></div>
+                  <div class="mc-c">用户偏好简洁的代码风格，注释以解释「为什么」而非「做了什么」为主</div>
+                  <div class="mc-tags"><span class="chip">代码风格</span><span class="chip">沟通</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:92%"></i></span>0.92</span><span>引用 34 次</span><span>2 天前</span></div>
+                </div>
+                <div class="mem-card" data-type="habit">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip cyan">习惯</span><span class="badge">#m-042</span></div>
+                  <div class="mc-c">前端项目固定使用 TypeScript + PNPM，构建产物统一输出到 dist/</div>
+                  <div class="mc-tags"><span class="chip">工具链</span><span class="chip">前端</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:88%"></i></span>0.88</span><span>引用 21 次</span><span>5 天前</span></div>
+                </div>
+                <div class="mem-card" data-type="fact">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip" >事实</span><span class="badge">#m-015</span></div>
+                  <div class="mc-c">开发环境依赖 MySQL 3306 / Redis 6379 / Milvus 19530 / MinIO 19000，全部 localhost</div>
+                  <div class="mc-tags"><span class="chip">环境</span><span class="chip">kb-rag</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:96%"></i></span>0.96</span><span>引用 12 次</span><span>今天</span></div>
+                </div>
+                <div class="mem-card" data-type="conclusion">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip ok">结论</span><span class="badge">#m-103</span></div>
+                  <div class="mc-c">kb-rag 决定采用 LLMLingua 侧车做 Token 压缩，失败时回退零依赖启发式</div>
+                  <div class="mc-tags"><span class="chip">架构决策</span><span class="chip">kb-rag</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:81%"></i></span>0.81</span><span>引用 7 次</span><span>1 周前</span></div>
+                </div>
+                <div class="mem-card" data-type="summary">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip warn">摘要</span><span class="badge">#m-118</span></div>
+                  <div class="mc-c">2026-08 会话总结：完成鉴权模块重构，覆盖率由 71% 提升至 92.4%</div>
+                  <div class="mc-tags"><span class="chip">会话摘要</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:74%"></i></span>0.74</span><span>引用 3 次</span><span>3 天前</span></div>
+                </div>
+                <div class="mem-card" data-type="preference">
+                  <div class="mc-a"><button class="mini"><svg class="ic ic-s"><use href="#i-edit"/></svg></button><button class="mini"><svg class="ic ic-s"><use href="#i-trash"/></svg></button></div>
+                  <div class="mc-top"><span class="chip purple">偏好</span><span class="badge">#m-076</span></div>
+                  <div class="mc-c">回复偏好结构化表格 + 明确的待跟进项列表，避免低信息量表述</div>
+                  <div class="mc-tags"><span class="chip">沟通</span><span class="chip">输出格式</span></div>
+                  <div class="mc-f"><span class="conf">置信度<span class="conf-bar"><i style="width:90%"></i></span>0.90</span><span>引用 41 次</span><span>今天</span></div>
+                </div>
+              </div>
+
+              <div class="panel" style="margin-top:18px">
+                <div class="panel-h"><svg class="ic ic-s"><use href="#i-clock"/></svg>遗忘 / 归档策略<span class="sp"></span><span class="t-dim t-sm">§5.3.5 ForgettingPolicy</span></div>
+                <div class="panel-b">
+                  <div class="set-row">
+                    <div class="sr-b"><div class="sr-t">启用自动遗忘</div><div class="sr-d">根据最后引用时间与置信度自动标记或清理过时记忆</div></div>
+                    <div class="sr-c"><label class="switch"><input type="checkbox" checked><span class="sw"></span></label></div>
+                  </div>
+                  <div class="row" style="margin-top:10px">
+                    <div class="field" style="margin:0"><label class="field-l">最大保留期（天）</label><input class="input mono" value="180"></div>
+                    <div class="field" style="margin:0"><label class="field-l">未使用宽限期（天）</label><input class="input mono" value="90"></div>
+                    <div class="field" style="margin:0"><label class="field-l">最低置信度</label><input class="input mono" value="0.3"></div>
+                  </div>
+                  <div class="field" style="margin-top:12px;margin-bottom:6px"><label class="field-l">到期动作</label>
+                    <div style="display:flex;gap:16px">
+                      <label class="radio"><input type="radio" name="fgAct" checked><span class="rd"></span><span>归档（保留但不再检索，可恢复）</span></label>
+                      <label class="radio"><input type="radio" name="fgAct"><span class="rd"></span><span>彻底删除</span></label>
+                      <label class="radio"><input type="radio" name="fgAct"><span class="rd"></span><span>永不自动遗忘</span></label>
+                    </div>
+                  </div>
+                  <div class="t-dim t-sm">当前已归档 9 条；归档记忆不再参与检索，可在归档分区查看与恢复。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 新增记忆弹窗 -->
+          <div class="mask" data-modal="modalAddMem">
+            <div class="modal sm">
+              <div class="modal-h"><svg class="ic"><use href="#i-brain"/></svg>
+                <div class="modal-t">添加记忆<small>§5.3.1 LongTermMemory · 手动新增</small></div>
+                <span style="flex:1"></span><button class="icon-btn" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+              </div>
+              <div class="modal-b">
+                <div class="field"><label class="field-l">类型</label>
+                  <select class="select"><option>fact 事实</option><option selected>preference 偏好</option><option>habit 习惯</option><option>conclusion 结论</option><option>summary 摘要</option></select>
+                </div>
+                <div class="field"><label class="field-l">内容 <span class="req">*</span></label><textarea class="textarea" rows="3" placeholder="例如：项目 X 的核心架构是微服务"></textarea></div>
+                <div class="field"><label class="field-l">标签</label><input class="input" value="架构, kb-rag"><div class="field-hint">逗号分隔，便于关键词检索与筛选</div></div>
+                <div class="row">
+                  <div class="field"><label class="field-l">有效期（天，可选）</label><input class="input mono" placeholder="留空 = 长期有效"></div>
+                  <div class="field"><label class="field-l">来源</label><input class="input mono" value="user_input" disabled></div>
+                </div>
+              </div>
+              <div class="modal-f"><span class="sp"></span><button class="btn" data-close>取消</button><button class="btn primary" data-close>保存记忆</button></div>
+            </div>
+          </div>
+
+          <div class="anno" style="top:150px;right:80px"><div class="anno-dot">1</div><div class="anno-pop"><b>记忆卡片</b>：展示内容、类型标签、置信度、标签、最后更新时间与被引用次数；悬停出现编辑 / 删除（删除需二次确认）。<span class="src">§5.3.6 UI/UX</span></div></div>
+          <div class="anno" style="bottom:90px;left:230px"><div class="anno-dot">2</div><div class="anno-pop"><b>遗忘策略</b>：maxAgeDays / unusedGraceDays / minConfidence 可配置，到期动作支持归档或删除，归档后可恢复。<span class="src">§5.3.5 ForgettingPolicy</span></div></div>
+        </div>
+        </section>
+        <!-- ========== 06 设置中心 ========== -->
+        <section class="frame" data-screen="settings">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 设置</div>
+            <div class="tbar-r"><span class="chip">v0.9.3-preview</span></div>
+          </div>
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <div class="hdr-spacer"></div>
+            <span class="status-chip"><span class="dot"></span>设置已同步到本地</span>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-x"/></svg></button>
+          </header>
+
+          <div class="set-grid">
+            <nav class="set-nav">
+              <button class="set-nav-i on" data-go="settings" data-tab="general"><svg class="ic ic-s"><use href="#i-set"/></svg>通用</button>
+              <button class="set-nav-i" data-go="models"><svg class="ic ic-s"><use href="#i-layers"/></svg>模型 Provider</button>
+              <button class="set-nav-i" data-go="memory"><svg class="ic ic-s"><use href="#i-brain"/></svg>长期记忆</button>
+              <button class="set-nav-i" data-go="settings" data-tab="perm"><svg class="ic ic-s"><use href="#i-shield"/></svg>权限与审批</button>
+              <button class="set-nav-i" data-go="settings" data-tab="keymap"><svg class="ic ic-s"><use href="#i-key"/></svg>快捷键</button>
+              <button class="set-nav-i" data-go="settings" data-tab="usage"><svg class="ic ic-s"><use href="#i-spark"/></svg>用量仪表盘</button>
+              <button class="set-nav-i" data-go="settings" data-tab="about"><svg class="ic ic-s"><use href="#i-info"/></svg>关于</button>
+              <div style="height:10px"></div>
+              <button class="set-nav-i" data-go="plugins"><svg class="ic ic-s"><use href="#i-plugin"/></svg>插件市场</button>
+            </nav>
+
+            <div class="set-main" id="setMain">
+              <!-- ---------- 通用 ---------- -->
+              <div class="set-pane" data-tab="general">
+                <div class="set-h"><div><div class="t">通用设置</div><div class="d">应用级偏好开关。带「即时生效」标记的选项会立即作用于本原型界面，便于直观验证。</div></div></div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">启动行为</div>
+                  <div class="panel"><div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">开机时自动启动</div><div class="sr-d">注册系统自启动项（macOS launchd / Windows 注册表 / Linux systemd user unit）</div></div><div class="sr-c"><label class="switch"><input type="checkbox"><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">启动时恢复上次会话</div><div class="sr-d">重新打开应用后恢复未结束的对话与任务上下文</div></div><div class="sr-c"><label class="switch"><input type="checkbox" checked><span class="sw"></span></label></div></div>
+                  </div></div>
+                </div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">界面与交互</div>
+                  <div class="panel"><div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">启用动画效果 <span class="badge acc">即时生效</span></div><div class="sr-d">消息过渡与流式渲染动画；低配设备可关闭以提升流畅度</div></div><div class="sr-c"><label class="switch"><input type="checkbox" checked data-live="anim"><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">显示详细操作日志 <span class="badge acc">即时生效</span></div><div class="sr-d">在对话中展示工具调用完整参数与模型路由决策过程</div></div><div class="sr-c"><label class="switch"><input type="checkbox" data-live="log"><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">紧凑模式 <span class="badge acc">即时生效</span></div><div class="sr-d">减少间距与圆角，适合小屏或高分屏多窗口</div></div><div class="sr-c"><label class="switch"><input type="checkbox" data-live="compact"><span class="sw"></span></label></div></div>
+                  </div></div>
+                </div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">语言与区域</div>
+                  <div class="panel"><div class="panel-b">
+                    <div class="row">
+                      <div class="field" style="margin:0"><label class="field-l">界面语言</label><select class="select"><option>简体中文 zh-CN</option><option>繁體中文 zh-TW</option><option>English en-US</option><option>日本語 ja-JP</option><option>한국어 ko-KR</option></select></div>
+                      <div class="field" style="margin:0"><label class="field-l">时区</label><select class="select"><option>Asia/Shanghai (UTC+8)</option><option>UTC</option><option>America/Los_Angeles</option></select></div>
+                    </div>
+                  </div></div>
+                </div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">记忆管理</div>
+                  <div class="panel"><div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">自动提取记忆</div><div class="sr-d">Agent 在对话中自动识别值得长期记忆的信息；关闭后已有记忆仍可被检索</div></div><div class="sr-c"><label class="switch"><input type="checkbox" checked><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">对话中显示「⚡ 基于记忆」提示 <span class="badge acc">即时生效</span></div><div class="sr-d">关闭后不再在助手消息下方渲染 memoryHint</div></div><div class="sr-c"><label class="switch"><input type="checkbox" checked data-live="mem"><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">遗忘策略</div><div class="sr-d">详见「长期记忆」页可配置最大保留期与宽限期</div></div><div class="sr-c"><select class="select" style="width:170px"><option>180 天 / 90 天宽限</option><option>90 天 / 30 天宽限</option><option>永不自动遗忘</option></select></div></div>
+                  </div></div>
+                </div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">数据与遥测</div>
+                  <div class="panel"><div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">本地用量统计</div><div class="sr-d">仅本地统计 Token 与调用次数，不向任何服务端上报</div></div><div class="sr-c"><label class="switch"><input type="checkbox" checked><span class="sw"></span></label></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">崩溃报告</div><div class="sr-d">可选上报崩溃堆栈；关闭后仅在本地日志留存</div></div><div class="sr-c"><label class="switch"><input type="checkbox"><span class="sw"></span></label></div></div>
+                  </div></div>
+                </div>
+
+                <div class="set-sec">
+                  <div class="set-sec-t">危险区</div>
+                  <div class="panel" style="border-color:var(--danger-soft)"><div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">清除所有凭据</div><div class="sr-d">清空 Keychain 中本工具名下的全部 API Key 与 OAuth Token</div></div><div class="sr-c"><button class="btn danger"><svg class="ic ic-s"><use href="#i-trash"/></svg>清除</button></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">恢复默认设置</div><div class="sr-d">不影响对话记录、长期记忆与已安装插件</div></div><div class="sr-c"><button class="btn">恢复默认</button></div></div>
+                  </div></div>
+                </div>
+              </div>
+
+              <!-- ---------- 权限与审批 ---------- -->
+              <div class="set-pane" data-tab="perm" hidden>
+                <div class="set-h"><div><div class="t">权限与审批</div><div class="d">文件 / 命令 / 网络分级管控；高风险操作默认手动审批。企业自部署时可由管理员集中下发策略。</div></div></div>
+
+                <div class="panel" style="margin-bottom:16px">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-shield"/></svg>权限矩阵<span class="sp"></span><span class="t-dim t-sm">§10.1 PermissionSystem</span></div>
+                  <table class="tbl">
+                    <thead><tr><th style="width:150px">能力</th><th style="width:90px">等级</th><th>作用域</th><th style="width:220px">策略</th></tr></thead>
+                    <tbody>
+                      <tr><td>读取文件</td><td><span class="chip ok">readOnly</span></td><td class="mono t-dim">工作区内全部路径</td><td><select class="select" style="height:24px"><option>自动允许</option><option>手动审批</option><option>禁止</option></select></td></tr>
+                      <tr><td>写入 / 编辑文件</td><td><span class="chip cyan">write</span></td><td class="mono t-dim">工作区内，排除 .env / *.key</td><td><select class="select" style="height:24px"><option>自动允许</option><option selected>手动审批</option><option>禁止</option></select></td></tr>
+                      <tr><td>执行 Shell 命令</td><td><span class="chip warn">execute</span></td><td class="mono t-dim">白名单内命令</td><td><select class="select" style="height:24px"><option>自动允许</option><option selected>手动审批</option><option>禁止</option></select></td></tr>
+                      <tr><td>网络请求</td><td><span class="chip warn">network</span></td><td class="mono t-dim">*.deepseek.com, *.bigmodel.cn</td><td><select class="select" style="height:24px"><option selected>自动允许</option><option>手动审批</option><option>禁止</option></select></td></tr>
+                      <tr><td>系统级操作</td><td><span class="chip danger">system</span></td><td class="mono t-dim">自启动项 / 凭据 / 注册表</td><td><select class="select" style="height:24px"><option>自动允许</option><option>手动审批</option><option selected>禁止</option></select></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="row" style="margin-bottom:16px;gap:16px">
+                  <div class="panel" style="flex:1">
+                    <div class="panel-h"><svg class="ic ic-s"><use href="#i-term"/></svg>命令白名单</div>
+                    <div class="panel-b"><textarea class="textarea mono" rows="6">pnpm test
+pnpm build
+git status
+git diff
+vitest run</textarea></div>
+                  </div>
+                  <div class="panel" style="flex:1">
+                    <div class="panel-h"><svg class="ic ic-s"><use href="#i-warn"/></svg>命令黑名单（始终拒绝）</div>
+                    <div class="panel-b"><textarea class="textarea mono" rows="6">rm -rf /
+rm -rf ~
+git push --force
+curl | sh
+chmod 777 *</textarea></div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-history"/></svg>审批历史 · 最近 24 小时<span class="sp"></span><button class="btn sm ghost"><svg class="ic ic-s"><use href="#i-down"/></svg>导出审计日志</button></div>
+                  <table class="tbl">
+                    <thead><tr><th style="width:130px">时间</th><th style="width:180px">工具</th><th>参数摘要</th><th style="width:100px">成本</th><th style="width:100px">结果</th></tr></thead>
+                    <tbody>
+                      <tr><td class="mono t-dim">14:03:12</td><td class="mono">file_tools.delete</td><td class="mono t-dim">rm -rf ./dist/legacy-cache</td><td class="mono t-dim">费用未知</td><td><span class="chip ok">已允许·仅本次</span></td></tr>
+                      <tr><td class="mono t-dim">14:02:41</td><td class="mono">generate_video</td><td class="mono t-dim">sora · 10s · 1080p</td><td class="mono t-warn">≈ $0.3200</td><td><span class="chip ok">已允许·仅本次</span></td></tr>
+                      <tr><td class="mono t-dim">13:58:03</td><td class="mono">git_tools.git_push</td><td class="mono t-dim">origin main · 3 commits</td><td class="mono t-dim">费用未知</td><td><span class="chip danger">已拒绝</span></td></tr>
+                      <tr><td class="mono t-dim">11:20:44</td><td class="mono">execute_code</td><td class="mono t-dim">vitest run auth</td><td class="mono t-dim">费用未知</td><td><span class="chip ok">始终允许</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ---------- 快捷键 ---------- -->
+              <div class="set-pane" data-tab="keymap" hidden>
+                <div class="set-h"><div>
+                  <div class="t">快捷键</div>
+                  <div class="d">点击任意行右侧「编辑」进入录制态，按下新组合键即可覆盖；与已有键位冲突时会给出提示。可一键重置或同步到云端（E2EE）。</div></div>
+                  <span class="sp"></span>
+                  <button class="btn"><svg class="ic ic-s"><use href="#i-refresh"/></svg>重置为默认</button>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:14px">
+                  <label class="search" style="max-width:280px"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索命令或键位…"></label>
+                  <span style="flex:1"></span>
+                  <label class="switch" style="align-self:center"><input type="checkbox" checked><span class="sw"></span><span class="t-sm t-dim">同步快捷键到云端（端到端加密）</span></label>
+                </div>
+
+                <div class="panel" style="margin-bottom:14px">
+                  <div class="panel-h">对话</div>
+                  <div class="kb-row"><div class="kb-name">发送消息<small>chat.send</small></div><div class="keys"><span class="key">Enter</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">换行（不发送）<small>chat.newline</small></div><div class="keys"><span class="key">Shift</span><span class="key">Enter</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">聚焦输入框 / 命令面板<small>chat.focus</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">K</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">触发 @提及<small>chat.mention</small></div><div class="keys"><span class="key">@</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">切换 Markdown 预览<small>chat.togglePreview</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">/</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">快速切换模型<small>chat.cycleModel</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">↑</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">取消当前生成 / 关闭下拉<small>chat.cancel</small></div><div class="keys"><span class="key">Esc</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-h">全局</div>
+                  <div class="kb-row"><div class="kb-name">新建会话<small>app.newSession</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">N</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">打开设置<small>app.settings</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">,</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                  <div class="kb-row"><div class="kb-name">切换侧边栏<small>app.toggleSidebar</small></div><div class="keys"><span class="key">Ctrl</span><span class="key">B</span></div><span style="flex:1"></span><button class="btn sm ghost" data-rec>编辑</button></div>
+                </div>
+              </div>
+
+              <!-- ---------- 用量仪表盘 ---------- -->
+              <div class="set-pane" data-tab="usage" hidden>
+                <div class="set-h"><div><div class="t">用量仪表盘</div><div class="d">仅本地统计与成本预估，不涉及任何计费或扣费。实际费用由各模型厂商按其规则与你自行结算。</div></div>
+                  <span class="sp"></span>
+                  <select class="select" style="width:130px"><option>本月</option><option>本周</option><option>全部</option></select>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+                  <div class="metric"><div class="l">输入 Token</div><div class="v">1.82 M</div><div class="d">较上月 +18.4%</div></div>
+                  <div class="metric"><div class="l">输出 Token</div><div class="v">0.46 M</div><div class="d">较上月 +9.1%</div></div>
+                  <div class="metric"><div class="l">工具调用</div><div class="v">3,284</div><div class="d">失败率 0.7%</div></div>
+                  <div class="metric"><div class="l">预估 API 费用</div><div class="v" id="costTotal">≈ $0.98</div><div class="d">按配置单价估算 · 非本工具收费</div></div>
+                </div>
+
+                <div class="panel" style="margin-bottom:16px">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-spark"/></svg>按模型分布（近 8 周）</div>
+                  <div class="panel-b">
+                    <div class="chart" style="margin-bottom:22px">
+                      <div class="bar" style="height:38%"><span>W1</span></div>
+                      <div class="bar" style="height:52%"><span>W2</span></div>
+                      <div class="bar" style="height:44%"><span>W3</span></div>
+                      <div class="bar" style="height:67%"><span>W4</span></div>
+                      <div class="bar" style="height:81%"><span>W5</span></div>
+                      <div class="bar" style="height:73%"><span>W6</span></div>
+                      <div class="bar" style="height:94%"><span>W7</span></div>
+                      <div class="bar" style="height:88%"><span>W8</span></div>
+                    </div>
+                    <table class="tbl">
+                      <thead><tr><th>模型</th><th class="num">调用</th><th class="num">输入</th><th class="num">输出</th><th class="num">预估费用</th></tr></thead>
+                      <tbody id="costBody">
+                        <tr data-in="1.21" data-out="0.31" data-pin="0.27" data-pout="1.10"><td><span class="badge acc">deepseek</span> deepseek-chat</td><td class="num">1,842</td><td class="num">1.21 M</td><td class="num">0.31 M</td><td class="num t-acc" data-cost>≈ $0.67</td></tr>
+                        <tr data-in="0.34" data-out="0.09" data-pin="0.50" data-pout="0.50"><td><span class="badge">zhipu</span> glm-4-plus</td><td class="num">612</td><td class="num">0.34 M</td><td class="num">0.09 M</td><td class="num t-acc" data-cost>≈ $0.22</td></tr>
+                        <tr data-in="0.27" data-out="0.06" data-pin="0.30" data-pout="0.30"><td><span class="badge">aliyun</span> qwen-long</td><td class="num">288</td><td class="num">0.27 M</td><td class="num">0.06 M</td><td class="num t-acc" data-cost>≈ $0.10</td></tr>
+                        <tr data-in="0" data-out="0" data-pin="" data-pout=""><td><span class="badge">openai</span> dall-e-3</td><td class="num">14</td><td class="num">—</td><td class="num">—</td><td class="num t-dim" data-cost>费用未知</td></tr>
+                        <tr data-in="0.08" data-out="0.02" data-pin="" data-pout=""><td><span class="badge">local</span> openai-compat:local-llm</td><td class="num">96</td><td class="num">0.08 M</td><td class="num">0.02 M</td><td class="num t-dim" data-cost>费用未知</td></tr>
+                      </tbody>
+                    </table>
+                    <div class="t-dim t-sm" style="margin-top:10px">「费用未知」= 该模型未配置「每百万 token 单价」。在「模型 Provider → 添加自定义模型」填写单价后，将自动按 <span class="mono">(输入×输入单价 + 输出×输出单价)</span> 估算（输入/输出以百万为单位）。</div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-bell"/></svg>告警阈值</div>
+                  <div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">月度预估费用告警</div><div class="sr-d">达到阈值后在状态栏与通知中心提示（仅提醒，不阻断调用）</div></div><div class="sr-c"><input class="input mono" style="width:120px" value="50.00"><span class="t-dim">USD</span></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">单次调用 Token 上限</div><div class="sr-d">超过后自动触发上下文压缩</div></div><div class="sr-c"><input class="input mono" style="width:120px" value="64000"></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ---------- 关于 ---------- -->
+              <div class="set-pane" data-tab="about" hidden>
+                <div class="set-h"><div><div class="t">关于 deepseek-harness</div><div class="d">完全开源、完全本地运行（Local-First）的智能体客户端。源代码公开，允许自由使用、修改和分发，无需向本工具支付任何费用。</div></div></div>
+
+                <div class="panel" style="margin-bottom:16px">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-info"/></svg>项目信息</div>
+                  <div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">项目</div><div class="sr-d">deepseek-harness（缩写 DSH，遵循上游品牌规范）</div></div><div class="sr-c mono t-dim">—</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">版本</div><div class="sr-d">由 package.json 自动注入</div></div><div class="sr-c mono">v0.9.3-preview</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">许可协议</div><div class="sr-d">与上游 deepseek-ai/deepseek-harness 保持一致，商业友好</div></div><div class="sr-c"><span class="chip ok">MIT</span></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">仓库</div><div class="sr-d">Issues / Discussions / 贡献入口</div></div><div class="sr-c mono t-acc">github.com/deepseek-ai/deepseek-harness</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">运行形态</div><div class="sr-d">核心逻辑、数据存储、凭据均在用户本机</div></div><div class="sr-c"><span class="chip cyan">Local-First</span></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">费用模型</div><div class="sr-d">本工具免费；第三方模型 API 费用由用户与厂商自行结算</div></div><div class="sr-c"><span class="chip ok">免费</span></div></div>
+                  </div>
+                </div>
+
+                <div class="panel" style="margin-bottom:16px;border-color:var(--warn-soft)">
+                  <div class="panel-h" style="color:var(--warn)"><svg class="ic ic-s"><use href="#i-warn"/></svg>作者与联系 <span class="badge">【发布前必填】</span></div>
+                  <div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">核心维护者</div><div class="sr-d">占位示例，发布前请替换为真实姓名与邮箱</div></div><div class="sr-c mono t-warn">【发布前必填】</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">模型 Provider 模块</div><div class="sr-d">占位示例</div></div><div class="sr-c mono t-warn">【发布前必填】</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">安全漏洞反馈邮箱</div><div class="sr-d">安全事项请勿公开 Issue</div></div><div class="sr-c mono t-warn">security@【发布前必填】.org</div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">行为准则 / 许可文件</div><div class="sr-d">需生成真实的 CODE_OF_CONDUCT.md 与 LICENSE 放入仓库根目录</div></div><div class="sr-c mono t-warn">【发布前必填】</div></div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-h"><svg class="ic ic-s"><use href="#i-globe"/></svg>社区与生态</div>
+                  <div class="panel-b" style="padding:0 12px">
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">GitHub Issues</div><div class="sr-d">Bug 反馈、功能请求</div></div><div class="sr-c"><button class="btn sm">前往</button></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">GitHub Discussions</div><div class="sr-d">使用讨论、Q&amp;A、想法交流</div></div><div class="sr-c"><button class="btn sm">前往</button></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">Discord 社区</div><div class="sr-d">实时交流、答疑</div></div><div class="sr-c"><button class="btn sm">前往</button></div></div>
+                    <div class="set-row"><div class="sr-b"><div class="sr-t">插件发现标签</div><div class="sr-d">发布插件请添加该主题标签，便于社区发现</div></div><div class="sr-c"><span class="chip purple">dsh-plugin</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="statusbar">
+            <span><b>deepseek-harness</b> v0.9.3-preview</span><span>MIT</span>
+            <span class="sp"></span>
+            <span>设置文件 ~/.dsh/config.json</span><span>本地加密存储</span>
+          </div>
+
+          <div class="anno" style="top:150px;left:220px"><div class="anno-dot">1</div><div class="anno-pop"><b>即时生效开关</b>：动画 / 详细日志 / 紧凑模式 / 记忆提示 四个开关会立即改变本原型界面，用于验证设计意图。<span class="src">§14.3 GeneralSettings</span></div></div>
+          <div class="anno" style="bottom:60px;right:80px"><div class="anno-dot">2</div><div class="anno-pop"><b>成本统一入口</b>：所有预估成本均由 12.3.1 <span class="mono">CostEstimationService</span> 计算，无法估算时返回「费用未知」而非缺失字段。<span class="src">§12.3.1</span></div></div>
+        </div>
+        </section>
+
+        <!-- ========== 07 插件市场 ========== -->
+        <section class="frame" data-screen="plugins">
+        <div class="app">
+          <div class="tbar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tbar-title">deepseek-harness — 插件市场</div>
+            <div class="tbar-r"><span class="chip">18 个已安装</span></div>
+          </div>
+          <header class="hdr">
+            <div class="hdr-logo"><span class="mark">DS</span>deepseek-harness</div>
+            <div class="hdr-spacer"></div>
+            <button class="btn sm"><svg class="ic ic-s"><use href="#i-up"/></svg>从本地安装</button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-bell"/></svg></button>
+            <button class="icon-btn"><svg class="ic"><use href="#i-set"/></svg></button>
+            <div class="avatar">U</div>
+          </header>
+
+          <div class="main">
+            <aside class="side-l">
+              <div class="side-top">
+                <label class="search"><svg class="ic ic-s"><use href="#i-search"/></svg><input placeholder="搜索插件…"></label>
+              </div>
+              <div class="seg-tabs" data-seg="pgL">
+                <button class="seg-tab on" data-pane="all">发现</button>
+                <button class="seg-tab" data-pane="inst">已安装</button>
+                <button class="seg-tab" data-pane="upd">可更新</button>
+              </div>
+              <div class="side-scroll">
+                <div class="pane" data-pane="all">
+                  <div class="sec-label"><span>分类</span></div>
+                  <div class="tree-row on"><svg class="ic ic-s"><use href="#i-cube"/></svg><span class="nm">全部</span><span class="mut">126</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-code"/></svg><span class="nm">工具 Tool</span><span class="mut">48</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-spark"/></svg><span class="nm">Agent</span><span class="mut">21</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-eye"/></svg><span class="nm">UI / 主题</span><span class="mut">17</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-flow"/></svg><span class="nm">连接器</span><span class="mut">24</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-layers"/></svg><span class="nm">模型 Provider</span><span class="mut">9</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-branch"/></svg><span class="nm">工作流</span><span class="mut">7</span></div>
+                  <div class="sec-label"><span>来源</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-globe"/></svg><span class="nm">社区仓库</span><span class="mut">104</span></div>
+                  <div class="tree-row"><svg class="ic ic-s"><use href="#i-shield"/></svg><span class="nm">企业 Skill（自部署）</span><span class="mut">22</span></div>
+                </div>
+                <div class="pane" data-pane="inst" hidden>
+                  <div class="sec-label"><span>已启用 · 18</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-plugin"/></svg><span class="nm">deep-research</span><span class="mut">v1.4.0</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-plugin"/></svg><span class="nm">image-gen</span><span class="mut">v0.9.2</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-plugin"/></svg><span class="nm">connectors-jira</span><span class="mut">v2.1.3</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-dim"><use href="#i-plugin"/></svg><span class="nm">code-review</span><span class="mut" style="color:var(--text-4)">已停用</span></div>
+                </div>
+                <div class="pane" data-pane="upd" hidden>
+                  <div class="sec-label"><span>可更新 · 4</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-refresh"/></svg><span class="nm">deep-research</span><span class="mut" style="color:var(--warn)">1.4.0 → 1.5.0</span></div>
+                  <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-refresh"/></svg><span class="nm">ppt-generator</span><span class="mut" style="color:var(--warn)">0.7.1 → 0.8.0</span></div>
+                </div>
+              </div>
+            </aside>
+
+            <div class="center" style="overflow-y:auto;padding:16px 20px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <h2 style="font-size:15px;font-weight:700">精选插件</h2>
+                <span style="flex:1"></span>
+                <span class="chip on">全部 126</span>
+                <span class="chip">官方 12</span>
+                <span class="chip">企业 22</span>
+                <select class="select" style="width:130px"><option>按安装量</option><option>按更新时间</option><option>按评分</option></select>
+              </div>
+
+              <div class="pg-grid">
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico"><svg class="ic"><use href="#i-spark"/></svg></div><div><div class="pg-n">deep-research</div><div class="pg-a">官方 · v1.5.0</div></div></div>
+                  <div class="pg-d">多源检索 + 交叉验证 + 结构化报告的深度研究 Agent，支持一键导出 PDF / Word / PPT。</div>
+                  <div class="pg-f"><span class="badge acc">Agent</span><span class="pg-stat">12.4k 安装</span><span class="sp"></span><button class="btn sm">已安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--purple)"><svg class="ic"><use href="#i-image"/></svg></div><div><div class="pg-n">image-gen</div><div class="pg-a">官方 · v0.9.2</div></div></div>
+                  <div class="pg-d">图片生成与编辑工具，按模型路由分发到 DALL·E / CogView / 通义万相，产物可分享。</div>
+                  <div class="pg-f"><span class="badge">工具</span><span class="pg-stat">8.1k 安装</span><span class="sp"></span><button class="btn sm">已安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--ok)"><svg class="ic"><use href="#i-flow"/></svg></div><div><div class="pg-n">connectors-jira</div><div class="pg-a">社区 · v2.1.3</div></div></div>
+                  <div class="pg-d">Jira 连接器：创建 / 查询 Issue、更新状态、关联 PR，全部受权限审批管控。</div>
+                  <div class="pg-f"><span class="badge cyan">连接器</span><span class="pg-stat">3.2k 安装</span><span class="sp"></span><button class="btn sm">已安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--warn)"><svg class="ic"><use href="#i-ppt"/></svg></div><div><div class="pg-n">ppt-generator</div><div class="pg-a">官方 · v0.8.0</div></div></div>
+                  <div class="pg-d">基于主题或大纲生成 .pptx / .pdf，四种视觉风格，可自动插入图表。</div>
+                  <div class="pg-f"><span class="badge">工具</span><span class="pg-stat">5.7k 安装</span><span class="sp"></span><button class="btn sm primary">更新</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--cyan)"><svg class="ic"><use href="#i-layers"/></svg></div><div><div class="pg-n">provider-anthropic</div><div class="pg-a">社区 · v1.2.0</div></div></div>
+                  <div class="pg-d">Anthropic Claude 模型适配器，抹平 tool_use 与 function_call 差异。</div>
+                  <div class="pg-f"><span class="badge purple">模型 Provider</span><span class="pg-stat">2.9k 安装</span><span class="sp"></span><button class="btn sm">安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--pink)"><svg class="ic"><use href="#i-eye"/></svg></div><div><div class="pg-n">theme-noir</div><div class="pg-a">社区 · v1.0.4</div></div></div>
+                  <div class="pg-d">深色高对比主题插件，包含编辑器语法与图表配色，支持热切换。</div>
+                  <div class="pg-f"><span class="badge">UI / 主题</span><span class="pg-stat">1.4k 安装</span><span class="sp"></span><button class="btn sm">安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico"><svg class="ic"><use href="#i-code"/></svg></div><div><div class="pg-n">sql-explorer</div><div class="pg-a">社区 · v0.6.1</div></div></div>
+                  <div class="pg-d">通用 SQL 数据源工具：只读查询、Schema 检索、结果表格化，默认手动审批。</div>
+                  <div class="pg-f"><span class="badge">工具</span><span class="pg-stat">4.6k 安装</span><span class="sp"></span><button class="btn sm">安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--ok)"><svg class="ic"><use href="#i-shield"/></svg></div><div><div class="pg-n">enterprise-security-skill</div><div class="pg-a">企业 · v3.0.1</div></div></div>
+                  <div class="pg-d">团队自建企业 Skill：内部安全规则库 + 代码仓库连接器，由管理员一键推送。</div>
+                  <div class="pg-f"><span class="badge ok">企业 Skill</span><span class="pg-stat">组织内 42</span><span class="sp"></span><button class="btn sm primary">安装</button></div>
+                </div>
+                <div class="pg-card">
+                  <div class="pg-top"><div class="pg-ico" style="color:var(--purple)"><svg class="ic"><use href="#i-brain"/></svg></div><div><div class="pg-n">memory-visualizer</div><div class="pg-a">社区 · v0.4.2</div></div></div>
+                  <div class="pg-d">将长期记忆以知识图谱形式可视化，支持按类型、置信度与时间轴筛选。</div>
+                  <div class="pg-f"><span class="badge">UI</span><span class="pg-stat">820 安装</span><span class="sp"></span><button class="btn sm">安装</button></div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="side-r">
+              <div class="panel-h"><svg class="ic ic-s"><use href="#i-plugin"/></svg>插件详情</div>
+              <div class="side-scroll" style="padding:12px">
+                <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">
+                  <div class="pg-ico"><svg class="ic"><use href="#i-spark"/></svg></div>
+                  <div><div style="font-size:13px;font-weight:650">deep-research</div><div class="pg-a">官方 · v1.5.0 · MIT</div></div>
+                </div>
+                <div class="t-sm t-dim" style="line-height:1.7;margin-bottom:12px">多源检索 + 交叉验证 + 结构化报告的深度研究 Agent 插件。依赖模型 Provider 与 Web 能力，遵循统一插件契约。</div>
+                <div class="sec-label"><span>Manifest</span></div>
+                <div class="tree-row"><span class="nm mono">id</span><span class="mut">deep-research</span></div>
+                <div class="tree-row"><span class="nm mono">type</span><span class="mut">agent</span></div>
+                <div class="tree-row"><span class="nm mono">version</span><span class="mut">1.5.0</span></div>
+                <div class="tree-row"><span class="nm mono">peerDeps</span><span class="mut">model-service, web-cap</span></div>
+                <div class="sec-label"><span>申请权限</span></div>
+                <div class="tree-row"><svg class="ic ic-s t-warn"><use href="#i-globe"/></svg><span class="nm">网络访问（检索源）</span></div>
+                <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-file"/></svg><span class="nm">读取工作区文件</span></div>
+                <div class="tree-row"><svg class="ic ic-s t-dim"><use href="#i-db"/></svg><span class="nm">写入本地数据库</span></div>
+                <div class="sec-label"><span>生命周期</span></div>
+                <div class="tree-row"><svg class="ic ic-s t-ok"><use href="#i-check"/></svg><span class="nm">install → activate</span></div>
+                <div class="tree-row"><svg class="ic ic-s t-dim"><use href="#i-clock"/></svg><span class="nm">update / deactivate</span></div>
+                <div style="display:flex;gap:6px;margin-top:12px"><button class="btn sm" style="flex:1">停用</button><button class="btn sm danger" style="flex:1">卸载</button></div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="statusbar">
+            <span><b>插件</b> 18 已启用 / 126 可用</span><span>4 个可更新</span>
+            <span class="sp"></span>
+            <span>插件目录 ~/.dsh/plugins</span><span>沙箱隔离</span>
+          </div>
+
+          <div class="anno" style="top:150px;left:270px"><div class="anno-dot">1</div><div class="anno-pop"><b>万物皆插件</b>：工具 / Agent / UI / 主题 / 连接器 / 模型 Provider / 工作流七类，插件是系统唯一的扩展方式。<span class="src">§9.1 PluginSystem</span></div></div>
+          <div class="anno" style="bottom:120px;right:330px"><div class="anno-dot">2</div><div class="anno-pop"><b>企业 Skill</b>：Team 层级（自部署、免费）可由管理员发布并推送给团队成员，属插件分发能力，不涉及额外收费。<span class="src">§12.2</span></div></div>
+        </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   原型交互脚本（纯演示，无外部依赖）
+   ============================================================ */
+(function(){
+  'use strict';
+  var doc = document;
+
+  /* ---------- 屏幕元信息 ---------- */
+  var META = {
+    chat: {
+      t:'AI 对话（主形态）', c:'14.2',
+      d:'对话居中主形态：@提及下拉（文件 / 技能 / 连接器 / 记忆）、上下文条、工具调用卡、代码块、高风险审批卡（含「费用未知」占位）、产物卡片与流式生成状态；左右侧栏为会话列表与 Agent 任务 / 工具输出 / 上下文查看器。'
+    },
+    workspace: {
+      t:'主工作区 · IDE（副形态）', c:'14.1',
+      d:'五区完整布局（副形态，可从顶栏切换进入）：顶栏 / 左侧栏（任务·文件·Git·搜索·大纲·依赖）/ 编辑区 / 右侧 AI 对话面板 / 底部面板 + 状态栏。左侧栏可切换分区，任务列表可进入批量管理模式。'
+    },
+    research: {
+      t:'深度研究工作流', c:'§7',
+      d:'六阶段进度（理解 → 规划 → 并行检索 → 交叉验证 → 综合分析 → 生成报告），多源并行检索、内嵌可追溯引用、报告导出与一键生成 PPT。点击「继续研究」可推进进度。'
+    },
+    models: {
+      t:'模型 Provider 与自定义 Key', c:'§2.7 / §2.8',
+      d:'Provider 列表与健康状态、添加自定义模型表单、连通性测试（耗时 / 模型列表 / 修复建议）、多 Key 负载均衡与自动剔除。API Key 存系统 Keychain，不落明文。'
+    },
+    memory: {
+      t:'长期记忆管理', c:'§5.3',
+      d:'五类记忆（事实 / 偏好 / 习惯 / 结论 / 摘要）的展示、筛选、搜索、手动新增与编辑、遗忘归档策略、导入导出。'
+    },
+    settings: {
+      t:'设置中心', c:'§14.3 / §14.4 / §10 / §12',
+      d:'通用设置（开关即时生效）、权限与审批矩阵、快捷键自定义与云同步、用量仪表盘（本地统计 / 费用未知占位）、关于与社区。'
+    },
+    plugins: {
+      t:'插件市场', c:'§9',
+      d:'万物皆插件：工具 / Agent / UI / 主题 / 连接器 / 模型 Provider / 工作流七类插件的发现、安装、更新与权限详情。'
+    }
+  };
+
+  var railNav = doc.getElementById('railNav');
+  var frames  = doc.getElementById('frames');
+  var titleEl = doc.getElementById('scTitle');
+  var descEl  = doc.getElementById('scDesc');
+
+  function go(id, tab){
+    var target = frames.querySelector('.frame[data-screen="'+id+'"]');
+    if(!target) return;
+    frames.querySelectorAll('.frame').forEach(function(f){ f.classList.remove('on'); });
+    target.classList.add('on');
+
+    railNav.querySelectorAll('.nav-item').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-go') === id);
+    });
+    // 设置页内部导航高亮
+    target.querySelectorAll('.set-nav-i').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-go') === id && (!b.dataset.tab || b.dataset.tab === (tab||'general')));
+    });
+    if(id === 'settings') switchTab(target, tab || 'general');
+
+    var m = META[id] || {t:id, c:'', d:''};
+    titleEl.innerHTML = m.t + (m.c ? ' <span>'+m.c+'</span>' : '');
+    descEl.textContent = m.d;
+
+    doc.querySelector('.stage-body').scrollTop = 0;
+    fit();
+  }
+
+  function switchTab(scope, tab){
+    scope.querySelectorAll('.set-pane').forEach(function(p){
+      p.hidden = (p.getAttribute('data-tab') !== tab);
+    });
+    scope.querySelectorAll('.set-nav-i').forEach(function(b){
+      if(b.dataset.tab) b.classList.toggle('on', b.dataset.tab === tab);
+      else if(b.getAttribute('data-go') === 'settings') b.classList.remove('on');
+    });
+  }
+
+  /* ---------- 自适应缩放 ---------- */
+  function fit(){
+    var body = doc.querySelector('.stage-body');
+    if(!body || !frames) return;
+    var avail = body.clientWidth - 44;
+    var s = Math.min(1, avail / 1440);
+    frames.style.setProperty('--s', s.toFixed(4));
+  }
+  window.addEventListener('resize', fit);
+
+  /* ---------- Toast ---------- */
+  var zone = doc.createElement('div');
+  zone.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none';
+  doc.body.appendChild(zone);
+  function toast(msg, kind){
+    var t = doc.createElement('div');
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.innerHTML = (kind === 'ok' ? '<svg class="ic ic-s"><use href="#i-check"/></svg>'
+                  : kind === 'bad' ? '<svg class="ic ic-s"><use href="#i-warn"/></svg>'
+                  : '<svg class="ic ic-s"><use href="#i-info"/></svg>') + '<span>'+msg+'</span>';
+    zone.appendChild(t);
+    setTimeout(function(){ t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 1900);
+    setTimeout(function(){ t.remove(); }, 2300);
+  }
+
+  /* ---------- 全局点击委托 ---------- */
+  doc.addEventListener('click', function(e){
+    var el;
+
+    /* 屏幕 / 设置导航 */
+    if((el = e.target.closest('[data-go]'))){
+      go(el.getAttribute('data-go'), el.getAttribute('data-tab'));
+      return;
+    }
+
+    /* 分区 Segmented Tabs（左栏 / 右栏） */
+    if((el = e.target.closest('.seg-tab'))){
+      var group = el.closest('[data-seg]');
+      if(!group) return;
+      group.querySelectorAll('.seg-tab').forEach(function(b){ b.classList.remove('on'); });
+      el.classList.add('on');
+      var scope = group.parentElement;
+      scope.querySelectorAll('.pane').forEach(function(p){
+        p.hidden = (p.getAttribute('data-pane') !== el.getAttribute('data-pane'));
+      });
+      return;
+    }
+
+    /* 任务批量管理模式 */
+    if((el = e.target.closest('[data-toggle-batch]'))){
+      var pane = el.closest('.pane'); if(!pane) return;
+      var bar = pane.querySelector('.batch-bar'); if(!bar) return;
+      var on = (bar.style.display === 'none');
+      bar.style.display = on ? 'flex' : 'none';
+      pane.querySelectorAll('.cbx').forEach(function(c){ c.classList.toggle('hide', !on); });
+      pane.querySelectorAll('.task').forEach(function(t){ t.classList.remove('sel'); });
+      el.textContent = on ? '完成' : '批量';
+      el.classList.toggle('on', on);
+      syncSelCount(pane);
+      return;
+    }
+
+    /* 批量模式下选中任务 */
+    if((el = e.target.closest('.task'))){
+      var p = el.closest('.pane');
+      if(p){
+        var b = p.querySelector('.batch-bar');
+        if(b && b.style.display !== 'none' && el.querySelector('.cbx')){
+          el.classList.toggle('sel');
+          syncSelCount(p);
+          return;
+        }
+      }
+      if(!el.closest('.batch-bar')){
+        p = el.closest('.side-scroll');
+        if(p) p.querySelectorAll('.task').forEach(function(t){ t.classList.remove('on'); });
+        el.classList.add('on');
+      }
+      return;
+    }
+
+    /* 工具调用卡展开 */
+    if((el = e.target.closest('[data-toggle-tc]'))){
+      var card = el.closest('.toolcard');
+      var body = card.querySelector('.tc-b');
+      body.hidden = !body.hidden;
+      return;
+    }
+
+    /* 审批卡 */
+    if((el = e.target.closest('[data-approve-act]'))){
+      var ap = el.closest('.approve');
+      var act = el.getAttribute('data-approve-act');
+      var map = { once:'已允许（仅本次）', always:'已允许（始终）', deny:'已拒绝', edit:'已打开参数编辑' };
+      ap.classList.add('done');
+      var label = ap.querySelector('.ap-done-t');
+      if(label) label.textContent = map[act] || '已处理';
+      var ic = ap.querySelector('.ap-done .ic use');
+      if(ic) ic.setAttribute('href', act === 'deny' ? '#i-x' : '#i-check');
+      toast('审批结果：' + (map[act] || '已处理'), act === 'deny' ? '' : 'ok');
+      return;
+    }
+
+    /* 弹窗 */
+    if((el = e.target.closest('[data-open]'))){
+      var id = el.getAttribute('data-open');
+      var m = frames.querySelector('[data-modal="'+id+'"]');
+      if(m) m.classList.add('on');
+      return;
+    }
+    if(e.target.closest('[data-close]') || e.target.classList.contains('mask')){
+      e.target.closest('.mask').classList.remove('on');
+      return;
+    }
+
+    /* 连通性测试 */
+    if((el = e.target.closest('[data-test]'))){
+      var inModal = !!el.closest('.mask');
+      if(inModal){
+        toast('正在测试连接…');
+        setTimeout(function(){ toast('连接成功 · 328ms · 3 个模型可用', 'ok'); }, 800);
+      } else {
+        var out = doc.getElementById('testOut');
+        out.classList.add('on');
+        out.querySelector('.b').textContent = '正在探测 baseURL + apiKey …\nGET /v1/models …';
+        setTimeout(function(){
+          out.querySelector('.b').innerHTML =
+            'availableModels: [ "deepseek-chat", "deepseek-reasoner", "deepseek-coder" ]\n' +
+            'stream:        ✓ SSE 正常（首 token 142ms）\n' +
+            'tool_calls:    ✓ function_call 格式一致\n' +
+            'suggestion:    Key 有效，剩余配额 88%。建议开启多 Key 轮询以应对限流。';
+        }, 900);
+      }
+      return;
+    }
+
+    /* 记忆类型筛选 */
+    if((el = e.target.closest('[data-mfilter]'))){
+      var wrap = el.parentElement;
+      wrap.querySelectorAll('[data-mfilter]').forEach(function(b){ b.classList.remove('on'); });
+      el.classList.add('on');
+      var f = el.getAttribute('data-mfilter');
+      doc.querySelectorAll('#memGrid .mem-card').forEach(function(c){
+        c.style.display = (f === 'all' || c.getAttribute('data-type') === f) ? '' : 'none';
+      });
+      return;
+    }
+
+    /* 快捷键录制 */
+    if((el = e.target.closest('[data-rec]'))){
+      var row = el.closest('.kb-row');
+      var keys = row.querySelector('.keys');
+      keys.classList.add('rec');
+      keys.innerHTML = '<span class="key">按下新的组合键…</span>';
+      el.textContent = '录制中';
+      var done = false;
+      function onKey(ev){
+        if(done) return; done = true;
+        doc.removeEventListener('keydown', onKey);
+        keys.classList.remove('rec');
+        if(ev.key === 'Escape'){ el.textContent = '编辑'; return; }
+        var parts = [];
+        if(ev.ctrlKey) parts.push('Ctrl');
+        if(ev.altKey)  parts.push('Alt');
+        if(ev.shiftKey) parts.push('Shift');
+        var k = ev.key.length === 1 ? ev.key.toUpperCase() : ev.key;
+        if(['Control','Shift','Alt','Meta'].indexOf(ev.key) === -1) parts.push(k);
+        keys.innerHTML = parts.map(function(x){ return '<span class="key">'+x+'</span>'; }).join('');
+        el.textContent = '编辑';
+        toast('已绑定 ' + parts.join(' + '), 'ok');
+      }
+      doc.addEventListener('keydown', onKey);
+      return;
+    }
+  });
+
+  function syncSelCount(pane){
+    var n = pane.querySelectorAll('.task.sel').length;
+    pane.querySelectorAll('#selCnt, .selCnt').forEach(function(x){ x.textContent = n; });
+  }
+
+  /* ---------- 深度研究：推进进度 ---------- */
+  var rsRun = doc.getElementById('rsRun');
+  if(rsRun){
+    var cursor = 2; // 已完成到第 3 步（索引 2 为运行中）
+    rsRun.addEventListener('click', function(){
+      if(cursor > 5){ toast('研究已完成，可导出报告或生成 PPT'); return; }
+      var steps = doc.querySelectorAll('#rsSteps .step');
+      steps[cursor].classList.remove('run');
+      steps[cursor].classList.add('done');
+      steps[cursor].querySelector('.cir').innerHTML = '<svg class="ic ic-s"><use href="#i-check"/></svg>';
+      cursor++;
+      if(cursor <= 5){
+        steps[cursor].classList.add('run');
+        doc.getElementById('rsBar').style.width = Math.round((cursor/5)*100) + '%';
+        var names = ['理解需求','规划检索','并行检索','交叉验证','综合分析','生成报告'];
+        toast('已完成：' + names[cursor-1] + ' → 进入「' + names[cursor] + '」', 'ok');
+      } else {
+        doc.getElementById('rsBar').style.width = '100%';
+        toast('研究完成：报告已生成，可导出 PDF / Word / PPT', 'ok');
+      }
+    });
+  }
+
+  /* ---------- 通用设置：即时生效开关 ---------- */
+  var LIVE = { anim:'no-anim', compact:'compact', mem:'hide-mem', log:'show-log' };
+  doc.addEventListener('change', function(e){
+    var el = e.target.closest('[data-live]');
+    if(!el) return;
+    var key = el.getAttribute('data-live');
+    var cls = LIVE[key];
+    if(key === 'anim') doc.body.classList.toggle(cls, !el.checked);
+    else if(key === 'mem') doc.body.classList.toggle(cls, !el.checked);
+    else doc.body.classList.toggle(cls, el.checked);
+    fit();
+  });
+
+  /* ---------- 主题 / 标注 ---------- */
+  var btnTheme = doc.getElementById('btnTheme');
+  btnTheme.addEventListener('click', function(){
+    var light = doc.documentElement.getAttribute('data-theme') === 'light';
+    doc.documentElement.setAttribute('data-theme', light ? 'dark' : 'light');
+    btnTheme.classList.toggle('on', !light);
+    btnTheme.innerHTML = '<svg class="ic ic-s"><use href="#i-'+(light?'sun':'moon')+'"/></svg>' + (light ? '浅色' : '深色');
+  });
+  var btnAnno = doc.getElementById('btnAnno');
+  btnAnno.addEventListener('click', function(){
+    var on = doc.body.classList.toggle('anno-on');
+    btnAnno.classList.toggle('on', on);
+    toast(on ? '已开启设计标注：悬停粉色圆点查看设计依据' : '已关闭设计标注');
+  });
+
+  /* ---------- 用量仪表盘：按配置单价估算成本（每百万 token） ---------- */
+  function computeCost(){
+    var total = 0, hasAny = false;
+    doc.querySelectorAll('#costBody tr').forEach(function(tr){
+      var cell = tr.querySelector('[data-cost]'); if(!cell) return;
+      var pin  = parseFloat(tr.getAttribute('data-pin'));
+      var pout = parseFloat(tr.getAttribute('data-pout'));
+      var inn  = parseFloat(tr.getAttribute('data-in'));
+      var out  = parseFloat(tr.getAttribute('data-out'));
+      if(!isNaN(pin) && !isNaN(pout) && !isNaN(inn) && !isNaN(out)){
+        var amt = inn * pin + out * pout;   // 输入/输出单位已是「百万」，直接 × 单价（$/1M）
+        cell.textContent = '≈ $' + amt.toFixed(2);
+        cell.className = 'num t-acc';
+        total += amt; hasAny = true;
+      } else {
+        cell.textContent = '费用未知';
+        cell.className = 'num t-dim';
+      }
+    });
+    var el = doc.getElementById('costTotal');
+    if(el) el.textContent = hasAny ? '≈ $' + total.toFixed(2) : '费用未知';
+  }
+  computeCost();
+
+  /* ---------- 初始化 ---------- */
+  go('chat');
+  fit();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mD:/WorkSpace/deepseek-harness-master/apps/agent-client[39m
+
+ [32m✓[39m electron/harness/session.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+[90mstderr[2m | electron/harness/config.test.ts[2m > [22m[2mresolveMcpServers[2m > [22m[2mDSH_MCP_SERVERS 非法 JSON 时返回空数组且不抛出
+[22m[39m[config] 解析 MCP 服务器配置失败： SyntaxError: Unexpected token 'o', "not-json" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at parseMcpServersFromText (D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/config.ts:173:23)
+    at resolveMcpServers (D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/config.ts:147:19)
+    at D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/config.test.ts:44:12
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstderr[2m | electron/harness/config.test.ts[2m > [22m[2mresolveMcpServers[2m > [22m[2m跳过缺少必填字段的配置项
+[22m[39m[config] 跳过非法 MCP 服务器配置项： { name: [32m'no-id'[39m, url: [32m'http://x/mcp'[39m }
+[config] 跳过非法 MCP 服务器配置项： { id: [32m'c'[39m, name: [32m'C'[39m }
+
+ [32m✓[39m electron/harness/skill.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+[90mstderr[2m | electron/harness/mcp.test.ts[2m > [22m[2mMcpRuntime[2m > [22m[2m多服务器[2m > [22m[2m单个服务器失败不影响其他服务器
+[22m[39m[mcp] Failed to refresh tools for server "server-2": Error: Connection refused
+    at D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/mcp.test.ts:450:50
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+[mcp] Failed to refresh tools for server "server-2": Error: Connection refused
+    at D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/mcp.test.ts:450:50
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+
+ [32m✓[39m electron/harness/config.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+ [32m✓[39m electron/harness/mcp-streamable-http.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 168[2mms[22m[39m
+[90mstderr[2m | electron/harness/mcp.test.ts
+[22m[39m[mcp] Failed to refresh tools for server "test-server": [TypeError: fetch failed] {
+  [cause]: AggregateError: 
+  [90m    at internalConnectMultiple (node:net:1193:18)[39m
+  [90m    at afterConnectMultiple (node:net:1783:7)[39m {
+    code: [32m'ECONNREFUSED'[39m,
+    [errors]: [ [36m[Error][39m, [36m[Error][39m ]
+  }
+}
+
+[90mstderr[2m | electron/harness/mcp.test.ts
+[22m[39m[mcp] Failed to refresh tools for server "test-server": [TypeError: fetch failed] {
+  [cause]: AggregateError: 
+  [90m    at internalConnectMultiple (node:net:1193:18)[39m
+  [90m    at afterConnectMultiple (node:net:1783:7)[39m {
+    code: [32m'ECONNREFUSED'[39m,
+    [errors]: [ [36m[Error][39m, [36m[Error][39m ]
+  }
+}
+
+[90mstderr[2m | electron/harness/mcp.test.ts
+[22m[39m[mcp] Failed to refresh tools for server "test-server": [TypeError: fetch failed] {
+  [cause]: AggregateError: 
+  [90m    at internalConnectMultiple (node:net:1193:18)[39m
+  [90m    at afterConnectMultiple (node:net:1783:7)[39m {
+    code: [32m'ECONNREFUSED'[39m,
+    [errors]: [ [36m[Error][39m, [36m[Error][39m ]
+  }
+}
+
+[90mstderr[2m | electron/harness/mcp.test.ts
+[22m[39m[mcp] Failed to refresh tools for server "test-server": [TypeError: fetch failed] {
+  [cause]: AggregateError: 
+  [90m    at internalConnectMultiple (node:net:1193:18)[39m
+  [90m    at afterConnectMultiple (node:net:1783:7)[39m {
+    code: [32m'ECONNREFUSED'[39m,
+    [errors]: [ [36m[Error][39m, [36m[Error][39m ]
+  }
+}
+
+[90mstderr[2m | electron/harness/mcp.test.ts
+[22m[39m[mcp] Failed to refresh tools for server "server-1": [TypeError: fetch failed] {
+  [cause]: AggregateError: 
+  [90m    at internalConnectMultiple (node:net:1193:18)[39m
+  [90m    at afterConnectMultiple (node:net:1783:7)[39m {
+    code: [32m'ECONNREFUSED'[39m,
+    [errors]: [ [36m[Error][39m, [36m[Error][39m ]
+  }
+}
+
+ [32m✓[39m electron/harness/mcp.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 138[2mms[22m[39m
+ [32m✓[39m electron/harness/agent-loop.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 225[2mms[22m[39m
+ [32m✓[39m electron/harness/fs-tools.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 692[2mms[22m[39m
+ [32m✓[39m electron/harness/llm.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+[90mstderr[2m | electron/harness/context.test.ts[2m > [22m[2mContext[2m > [22m[2mevent system[2m > [22m[2mlistener error does not affect other listeners
+[22m[39m[harness] event "test/event" listener error: Error: boom
+    at D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/context.test.ts:112:42
+    at Context.emit (D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/context.ts:122:9)
+    at D:/WorkSpace/deepseek-harness-master/apps/agent-client/electron/harness/context.test.ts:114:11
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10)
+    at file:///D:/WorkSpace/deepseek-harness-master/node_modules/[4m.pnpm[24m/@vitest+runner@4.1.8/node_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+
+ [32m✓[39m electron/harness/context.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m electron/harness/agent-loop.secure.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m electron/harness/app.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m electron/harness/tools.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [2m[90m↓[39m[22m electron/harness/agent-coding-java.e2e.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m electron/harness/mcp-office.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m electron/harness/agent-coding.e2e.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+ [32m✓[39m electron/harness/app.integration.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1160[2mms[22m[39m
+       [33m[2m✓[22m[39m starts and stops successfully [33m 321[2mms[22m[39m
+       [33m[2m✓[22m[39m tracks events in order [33m 302[2mms[22m[39m
+ [32m✓[39m electron/harness/session-store-persistence.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 2222[2mms[22m[39m
+ [32m✓[39m electron/harness/session-persistence.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 2291[2mms[22m[39m
+ [32m✓[39m electron/harness/workspace.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1643[2mms[22m[39m
+     [33m[2m✓[22m[39m 提升到「读写 + 执行」后：写入与执行均允许 [33m 1437[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m16 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (19)[39m
+[2m      Tests [22m [1m[32m222 passed[39m[22m[2m | [22m[33m8 skipped[39m[90m (230)[39m
+[2m   Start at [22m 07:27:14
+[2m   Duration [22m 4.64s[2m (transform 10.91s, setup 0ms, import 13.89s, tests 8.80s, environment 4ms)[22m
+

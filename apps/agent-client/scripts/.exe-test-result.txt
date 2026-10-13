@@ -1,0 +1,4 @@
+RESULT: FAIL
+失败原因:
+  - mock-office 已成功连接（connected=true）
+  - mock-office 工具发现数 ≥ 1（实际 0）

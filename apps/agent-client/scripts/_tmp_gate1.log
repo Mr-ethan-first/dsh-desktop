@@ -1,0 +1,23 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mD:/WorkSpace/deepseek-harness-master/apps/agent-client[39m
+
+ [32m✓[39m tests/api-proxy.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 216[2mms[22m[39m
+ [32m✓[39m tests/workbench-preconditions.spec.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m tests/cordis-host.spec.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 182[2mms[22m[39m
+ [32m✓[39m tests/catalog.spec.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 897[2mms[22m[39m
+     [33m[2m✓[22m[39m exists and parses [33m 701[2mms[22m[39m
+ [32m✓[39m tests/plugin-host.spec.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 540[2mms[22m[39m
+ [32m✓[39m tests/scan-extensions.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m tests/dsh-web-launcher.spec.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 4368[2mms[22m[39m
+     [33m[2m✓[22m[39m only collects extensions that declare a dsh.bundle [33m 1089[2mms[22m[39m
+     [33m[2m✓[22m[39m builds the extensions resolver fallback from runtimeModulesDir (dropped-arg regression) [33m 484[2mms[22m[39m
+     [33m[2m✓[22m[39m mirrors every runtime top-level entry, plus bare names that only exist scoped [33m 370[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent and never throws on repeat calls [33m 753[2mms[22m[39m
+     [33m[2m✓[22m[39m prepareDshHome builds the fallback when runtimeModulesDir is supplied [33m 577[2mms[22m[39m
+     [33m[2m✓[22m[39m prepareDshHome leaves an unchanged profile manifest untouched (no mtime churn) [33m 318[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[32m52 passed[39m[22m[90m (52)[39m
+[2m   Start at [22m 07:25:55
+[2m   Duration [22m 7.79s[2m (transform 5.05s, setup 0ms, import 8.45s, tests 6.34s, environment 1ms)[22m
+

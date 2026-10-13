@@ -1,0 +1,75 @@
+{
+  "name": "@deepseek-ai/dsh-agent-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "description": "deepseek-harness 二次开发客户端（外层适配层接入智谱 OpenAI 兼容接口），harness 零改动。",
+  "scripts": {
+    "build:harness": "tsc -p electron/harness/tsconfig.json",
+    "typecheck": "tsc -p electron/harness/tsconfig.json",
+    "pack:setup": "pnpm add -D electron@^44.1.1 electron-builder@^26.16.0",
+    "pack:app": "node scripts/pack-app-asar.mjs",
+    "office:mcp:start": "node scripts/start-office-mcp.mjs",
+    "office:mcp:excel": "uvx excel-mcp-server streamable-http",
+    "test:office": "vitest run electron/harness/mcp-office.integration.test.ts"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^1.4.13",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron": "44.1.1",
+    "electron-builder": "26.16.0",
+    "typescript": "^6.0.3",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.8"
+  },
+  "build": {
+    "appId": "com.deepseek.ai.agentclient",
+    "productName": "DeepSeekAgent",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "packages/extensions/**/*",
+      "apps/web/dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../desktop/runtime-dist",
+        "to": "dsh-runtime"
+      },
+      {
+        "from": "../../apps/web/dist",
+        "to": "apps/web/dist"
+      }
+    ],
+    "asarUnpack": [
+      "electron/**/*",
+      "packages/extensions/**/*"
+    ],
+    "win": {
+      "target": [
+        "dir",
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,214 @@
+/* Workspace right panel — docked in the shell.overlay layer. */
+
+.edgeBtn {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 50;
+  width: 28px;
+  height: 64px;
+  border: 1px solid #3a3a42;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  background: #2a2a30;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 16px;
+  pointer-events: auto;
+}
+.edgeBtn:hover { background: #34343c; }
+
+.root {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 380px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #1f1f23;
+  border-left: 1px solid #3a3a42;
+  color: #e0e0e0;
+  font-size: 13px;
+  pointer-events: auto;
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid #3a3a42;
+  background: #25252b;
+  flex: 0 0 auto;
+}
+.title { font-weight: 600; }
+.headerActions { display: flex; gap: 4px; }
+
+.iconBtn {
+  background: #34343c;
+  color: #e0e0e0;
+  border: 1px solid #46464f;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.iconBtn:hover { background: #40404a; }
+
+.body { display: flex; flex: 1 1 auto; min-height: 0; }
+
+.treePane {
+  width: 42%;
+  min-width: 140px;
+  border-right: 1px solid #3a3a42;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.rightPane {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabsBar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #3a3a42;
+  background: #25252b;
+  flex: 0 0 auto;
+}
+.tabs { display: flex; overflow-x: auto; flex: 1 1 auto; }
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: none;
+  border-right: 1px solid #3a3a42;
+  background: #20202a;
+  color: #b8b8c0;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 160px;
+}
+.tabActive { background: #2f2f3a; color: #ffffff; }
+.tabIcon { font-size: 12px; }
+.tabName { overflow: hidden; text-overflow: ellipsis; }
+.tabClose {
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  color: #9a9aa2;
+}
+.tabClose:hover { background: #46464f; color: #fff; }
+.addBrowser {
+  border: none;
+  background: transparent;
+  color: #8ab4f8;
+  cursor: pointer;
+  padding: 6px 10px;
+  flex: 0 0 auto;
+}
+.addBrowser:hover { background: #2f2f3a; }
+
+.content { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.contentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid #3a3a42;
+  background: #24242c;
+}
+.contentName {
+  font-size: 12px;
+  color: #c8c8d0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pre {
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #d8d8e0;
+  background: #1b1b20;
+}
+.errorBox {
+  margin: 0;
+  padding: 10px;
+  color: #ff8a8a;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  background: #fff;
+  min-height: 0;
+}
+
+.addrBar { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #3a3a42; }
+.addrInput {
+  flex: 1 1 auto;
+  background: #1b1b20;
+  border: 1px solid #46464f;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.empty {
+  margin: auto;
+  text-align: center;
+  color: #9a9aa2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+}
+.emptyIcon { font-size: 32px; opacity: 0.6; }
+
+.primaryBtn {
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.primaryBtn:hover { background: #3d8ae6; }
+
+.muted { color: #8a8a92; font-size: 12px; padding: 8px; }
+
+.treeList { list-style: none; margin: 0; padding: 0; }
+.treeRow { user-select: none; }
+.treeNode {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.treeNode:hover { background: #2c2c34; }
+.treeIcon { font-size: 12px; flex: 0 0 auto; }
+.treeName { overflow: hidden; text-overflow: ellipsis; }

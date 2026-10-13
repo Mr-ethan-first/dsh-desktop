@@ -1,0 +1,48 @@
+# Opt-in reference for dosev-ai/mcp-office (local-first, governed Office suite).
+# Exposes Excel + Word + PowerPoint as three standalone stdio MCP servers:
+#   excelmcp (65 tools), wordmcp (50 tools), pptmcp (46 tools).
+# Read-only .docx/.xlsx/.pptx work WITHOUT Microsoft Office; styling, PDF export,
+# and tracked-changes require Office installed (Windows 10/11, Python 3.11+).
+#
+# Prerequisite on the host running DSH:
+#   pip install mcp-office        # NOTE: PyPI `excelmcp` is an unrelated package
+#   python --version              # must be 3.11+
+#
+# DSH starts each server but does NOT run a package manager. Each server is
+# sandboxed to its own allowlist root via *_ALLOWLIST_ROOTS.
+- insert:
+    - id: office-excel-suite
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: excel-office
+        transport: stdio
+        command: python
+        args: ['-m', 'excelmcp.server']
+        env:
+          EXCEL_ALLOWLIST_ROOTS: !!js process.env.DSH_OFFICE_ROOT || process.cwd()
+          EXCEL_ENABLE_WRITE: 'true'
+        cwd: !!js process.cwd()
+
+    - id: office-word
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: word
+        transport: stdio
+        command: python
+        args: ['-m', 'wordmcp.server']
+        env:
+          WORD_ALLOWLIST_ROOTS: !!js process.env.DSH_OFFICE_ROOT || process.cwd()
+          WORD_ENABLE_WRITE: 'true'
+        cwd: !!js process.cwd()
+
+    - id: office-powerpoint
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: powerpoint
+        transport: stdio
+        command: python
+        args: ['-m', 'pptmcp.server']
+        env:
+          PPT_ALLOWLIST_ROOTS: !!js process.env.DSH_OFFICE_ROOT || process.cwd()
+          PPT_ENABLE_WRITE: 'true'
+        cwd: !!js process.cwd()

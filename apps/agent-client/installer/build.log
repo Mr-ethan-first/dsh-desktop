@@ -1,0 +1,20 @@
+Processing config: C:\Users\Administrator\AppData\Local\electron-builder\Cache\nsis\nsis-3.0.4.1\nsisconf.nsh
+Processing script file: "D:/WorkSpace/deepseek-harness-master/apps/agent-client/installer/DeepSeekAgent.nsi" (ACP)
+
+Processed 1 file, writing output (x86-ansi):
+
+Output: "D:\WorkSpace\deepseek-harness-master\apps\agent-client\release\DeepSeekAgent-Setup-0.1.0.exe"
+Install: 2 pages (128 bytes), 1 section (16408 bytes), 44115 instructions (1235220 bytes), 21434 strings (568167 bytes), 1 language table (262 bytes).
+Uninstall: 2 pages (192 bytes), 1 section (16408 bytes), 78 instructions (2184 bytes), 100 strings (1300 bytes), 1 language table (250 bytes).
+Datablock optimizer saved 31412 KiB (~4.2%).
+
+Using lzma (compress whole) compression.
+
+EXE header size:               49664 / 36864 bytes
+Install code:                          (1812457 bytes)
+Install data:                          (721702205 bytes)
+Uninstall code+data:                   (26506 bytes)
+Compressed data:           160219165 / 723541168 bytes
+CRC (0x729563CD):                  4 / 4 bytes
+
+Total size:                160268833 / 723578036 bytes (22.1%)

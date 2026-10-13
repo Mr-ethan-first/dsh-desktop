@@ -1,0 +1,9 @@
+{
+  "name": "sample-dsh-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "dsh": {
+    "capabilities": ["demo", "toast"],
+    "entry": "index.js"
+  }
+}

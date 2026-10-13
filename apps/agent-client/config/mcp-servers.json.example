@@ -1,0 +1,20 @@
+[
+  {
+    "id": "office-excel",
+    "name": "Excel（办公自动化）",
+    "url": "http://127.0.0.1:8017/mcp",
+    "enabled": true
+  },
+  {
+    "id": "office-word",
+    "name": "Word（办公自动化）",
+    "url": "http://127.0.0.1:8020/mcp",
+    "enabled": true
+  },
+  {
+    "id": "office-ppt",
+    "name": "PowerPoint（办公自动化）",
+    "url": "http://127.0.0.1:8021/mcp",
+    "enabled": true
+  }
+]

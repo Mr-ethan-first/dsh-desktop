@@ -1,0 +1,9 @@
+{
+  "name": "broken-dsh-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "dsh": {
+    "capabilities": ["broken"],
+    "entry": "index.js"
+  }
+}

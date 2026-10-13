@@ -1,0 +1,25 @@
+# Opt-in reference for haris-musa/excel-mcp-server (~3,800★, MIT).
+# High-star, mature, cross-platform Excel automation over the Model Context
+# Protocol. File-based (openpyxl): works on Windows WITHOUT Microsoft Excel
+# installed. Supports 20+ tools (read/write, formulas, charts, pivot tables,
+# data validation, tables, formatting) and both stdio and Streamable HTTP.
+#
+# Prerequisite on the host running DSH:
+#   Install the `uv` runtime (https://docs.astral.sh/uv/) so `uvx` can fetch
+#   and run the server.  Alternatively `pipx run excel-mcp-server stdio`.
+#
+# DSH starts the server but does NOT run a package manager or initialize files.
+- insert:
+    - id: office-excel
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: excel
+        transport: stdio
+        command: uvx
+        args: ['excel-mcp-server', 'stdio']
+        env:
+          # Scoped root for Excel files. Leave unset to default to the
+          # current working directory. The bridge scrubs ambient KEY/PASSWORD/
+          # SECRET/TOKEN/DSH_* vars, so only this explicit override is merged.
+          EXCEL_FILES_PATH: !!js process.env.EXCEL_FILES_PATH || process.cwd()
+        cwd: !!js process.cwd()
